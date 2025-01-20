@@ -12,7 +12,7 @@ DEFAULT_SETTINGS = {
     "setting3": "test"
 }
 
-class HelloWorldSkill(OVOSSkill):
+class NearTotalRecall(OVOSSkill):
     def __init__(self, *args, bus=None, **kwargs):
         """The __init__ method is called when the Skill is first constructed.
         Note that self.bus, self.skill_id, self.settings, and
