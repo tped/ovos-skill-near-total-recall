@@ -11,7 +11,7 @@ Information about your skill
 TBD - 
 - "Do you remember?"
 - "Do you recall"
-- "..."
+- "...."
 
 ## Credits
 

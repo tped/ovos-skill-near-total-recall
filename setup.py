@@ -5,7 +5,7 @@ from os import walk, path
 BASEDIR = path.abspath(path.dirname(__file__))
 URL = "https://github.com/tped/ovos-skill-near-total-recall"
 SKILL_CLAZZ = "NearTotalRecall"  # needs to match __init__.py class name
-PYPI_NAME = "ovos-near-total-recall"  # pip install PYPI_NAME
+PYPI_NAME = "ovos-skill-near-total-recall"  # pip install PYPI_NAME
 
 # below derived from github url to ensure standard skill_id
 SKILL_AUTHOR, SKILL_NAME = URL.split(".com/")[-1].split("/")
