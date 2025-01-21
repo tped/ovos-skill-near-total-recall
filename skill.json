@@ -1,1 +1,52 @@
-{}
+{
+    "title": "",
+    "url": "https://github.com/tped/ovos-skill-near-total-recall",
+    "summary": "",
+    "short_description": null,
+    "description": "Information about your skill",
+    "examples": [
+        "Do you remember?",
+        "Do you recall",
+        "..."
+    ],
+    "desktopFile": false,
+    "warning": "",
+    "systemDeps": false,
+    "requirements": {
+        "python": [
+            "ovos-bus-client",
+            "ovos-plugin-manager",
+            "ovos-utils",
+            "ovos-workshop"
+        ],
+        "system": {},
+        "skill": []
+    },
+    "incompatible_skills": [],
+    "platforms": [
+        "i386",
+        "x86_64",
+        "ia64",
+        "arm64",
+        "arm"
+    ],
+    "branch": "master",
+    "license": "Unknown",
+    "icon": "",
+    "category": "TODO:  MUCH TO DO!",
+    "categories": [
+        "TODO:  MUCH TO DO!"
+    ],
+    "tags": [
+        "ovos skill"
+    ],
+    "credits": [
+        "Tom",
+        "P",
+        "(@tped)"
+    ],
+    "skillname": "ovos-skill-near-total-recall",
+    "authorname": "tped",
+    "foldername": null,
+    "ovosskill": "MeePi Memory Recall Skill.  More to come"
+}
