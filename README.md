@@ -19,9 +19,9 @@ The Near Total Recall Skill enables you to retrieve and recall specific topics (
 ## Examples
 
 TBD ... 
-- "Do you remember?"
-- "Do you recall"
-- "...."
+- "Do you remember {topic}"
+- "Do you recall {topic}"
+- "Tell me about {topic}" ...."
 
 ## Credits
 

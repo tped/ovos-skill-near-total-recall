@@ -5,3 +5,4 @@ ovos-plugin-manager
 # Your requirements here
 pandas
 numpy
+Sentence-Transformers
