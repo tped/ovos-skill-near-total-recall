@@ -34,6 +34,9 @@ class NearTotalRecall(OVOSSkill):
         super().__init__(*args, bus=bus, **kwargs)
         self.learning = True
 
+        #  Moved here suggested by AI
+        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+
         # Load settings from self.settings
         self.cleaned_data_path = self.settings.get("cleaned_data_path")
         self.embeddings_path = self.settings.get("embeddings_path")
@@ -75,7 +78,8 @@ class NearTotalRecall(OVOSSkill):
     def initialize(self):
         # merge default settings
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
-        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+        # self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+        pass
 
     @classproperty
     def runtime_requirements(self):
@@ -131,7 +135,7 @@ class NearTotalRecall(OVOSSkill):
         # Assuming memory_id corresponds to the 'Timestamp' or another unique field
         memory_row = self.original_data[self.original_data['Timestamp'] == memory_id]
 
-        if not memory_row.empty:
+        if len(memory_row) > 0:  # instead of .empty:
             # Construct a full memory description
             full_memory = memory_row.iloc[0]['Memory_Description']
             return full_memory
