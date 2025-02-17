@@ -5,15 +5,16 @@
     "short_description": null,
     "description": "MeePi Memory Recall Skill.  Much More to come.  May or may not be useful to others",
     "examples": [
-        "Do you remember?",
-        "Do you recall",
-        "...."
+        "Do you remember {topic}",
+        "Do you recall {topic}",
+        "Tell me about {topic}\" ...."
     ],
     "desktopFile": false,
     "warning": "",
     "systemDeps": false,
     "requirements": {
         "python": [
+            "Sentence-Transformers",
             "numpy",
             "ovos-bus-client",
             "ovos-plugin-manager",
