@@ -13,7 +13,7 @@ from sentence_transformers import SentenceTransformer
 DEFAULT_SETTINGS = {
     "cleaned_data_path": "/path/to/cleaned_memories.csv",
     "embeddings_path": "/path/to/memory_embeddings.npy",
-    "original_data_path": "/path/to/MeePiMemories.csv",
+    "original_data_path": "/path/to/memories.csv",
 
     # Tuning parameters (from CONFIG in your Python script)
     "top_n": 5,  # Number of top results to return
