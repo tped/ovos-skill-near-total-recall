@@ -14,7 +14,9 @@ The Near Total Recall Skill enables you to retrieve and recall specific topics (
 
 ## Installation/Configuration
 
-<Much to do here ... dataset formats, pre-processing/cleaning ...>
+This contraption is complicated and in development ... it involves separate data collection, ML Pipeline & other stuff PLUS I'm just learning all this stuff!
+Probably best to stay away from this code
+
 
 ## Examples
 
