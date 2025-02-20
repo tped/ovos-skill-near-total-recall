@@ -1,6 +1,6 @@
 from ovos_utils import classproperty
 from ovos_utils.process_utils import RuntimeRequirements
-from ovos_workshop.intents import IntentBuilder
+# from ovos_workshop.intents import IntentBuilder
 from ovos_workshop.decorators import intent_handler
 # from ovos_workshop.intents import IntentHandler # Uncomment to use Adapt intents
 from ovos_workshop.skills import OVOSSkill
@@ -11,9 +11,9 @@ from sentence_transformers import SentenceTransformer
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
-    "cleaned_data_path": "/path/to/cleaned_memories.csv",
-    "embeddings_path": "/path/to/memory_embeddings.npy",
-    "original_data_path": "/path/to/memories.csv",
+    "cleaned_data_path": "/home/ovos/NTR-Data/cleaned_Memories.csv",
+    "embeddings_path": "/home/ovos/NTR-Data/MeePi_embeddings.npy",
+    "original_data_path": "/home/ovos/NTR-Data/MeePiMemories.csv",
 
     # Tuning parameters (from CONFIG in your Python script)
     "top_n": 5,  # Number of top results to return
@@ -33,6 +33,7 @@ class NearTotalRecall(OVOSSkill):
         """
         super().__init__(*args, bus=bus, **kwargs)
         self.learning = True
+        self.is_reciting = False  # Track if MeePi is currently babbling
 
         #  Moved here suggested by AI
         self.settings.merge(DEFAULT_SETTINGS, new_only=True)
@@ -153,25 +154,18 @@ class NearTotalRecall(OVOSSkill):
         if results:
             memory = results[0]  # Take the first match
             full_memory = self.recall_full_memory(memory[2])  # Use timestamp or similar for recall
+            self.is_reciting = True  # MeePi is about to speak
             self.speak_dialog("recite_memory", {"memory": full_memory})
+            self.is_reciting = False  # MeePi has finished speaking
         else:
             self.speak_dialog("no_memory_found")
 
-    @intent_handler(IntentBuilder("RoboticsLawsIntent").require("LawKeyword").build())
-    def handle_robotic_laws_intent(self, message):
-        """This is an Adapt intent handler, but using a RegEx intent."""
-        """This is an Adapt intent handler, it is triggered by a keyword.
-                Skills can log useful information. These will appear in the CLI and
-                the skills.log file."""
-        self.log.info("There are five types of log messages: " "info, debug, warning, error, and exception.")
-        # Optionally, get the RegEx group from the intent message
-        # law = str(message.data.get("LawOfRobotics", "all"))
-        self.speak_dialog("robotics")
-
     def stop(self):
-        """Optional action to take when "stop" is requested by the user.
-        This method should return True if it stopped something or
-        False (or None) otherwise.
-        If not relevant to your skill, feel free to remove.
+        """ Action to take when "stop" is requested by the user.
         """
-        return
+        if self.is_reciting:
+            self.speak("")  # Stop MeePi from talking
+            self.is_reciting = False
+            self.log.info("MeePi was interrupted by user.")
+            return True  # Indicate that MeePi stopped
+        return False  # Nothing was interrupted
