@@ -128,20 +128,31 @@ class NearTotalRecall(OVOSSkill):
     def recall_full_memory(self, memory_id):
         """
         This method retrieves the full memory details (e.g., from MeePiMemories.csv) using the memory ID.
+        We'll also see if it is long-winded and offer a summary
         """
-        if self.original_data is None:
+        if self.original_data is None or self.cleaned_data is None:
             self.log.error("Original data not loaded.")
             return None
 
         # Assuming memory_id corresponds to the 'Timestamp' or another unique field
         memory_row = self.original_data[self.original_data['Timestamp'] == memory_id]
+        cleaned_row = self.cleaned_data[self.cleaned_data['Timestamp'] == memory_id]
 
-        if len(memory_row) > 0:  # instead of .empty:
-            # Construct a full memory description
-            full_memory = memory_row.iloc[0]['Memory_Description']
-            return full_memory
-        else:
-            return None
+        if memory_row.empty:
+            return None  # Memory not found
+
+        # Extract details
+        description = memory_row.iloc[0]['Memory_Description']
+        is_long = cleaned_row.iloc[0].get("is_long_story", False) if not cleaned_row.empty else False
+        has_summary = "Memory_Summary" in cleaned_row and not pd.isna(cleaned_row.iloc[0].get("Memory_Summary", None))
+
+        # Warn the user and offer summary if available
+        if is_long:
+            response = self.get_response("long_story_warning")  # Ask user for choice
+            if response and "summary" in response.lower() and has_summary:
+                return cleaned_row.iloc[0]["Memory_Summary"]  # Return summary
+
+        return description  # Default to full memory
 
     @intent_handler("DoYouRecall.intent")
     def handle_do_you_recall_intent(self, message):
@@ -153,10 +164,15 @@ class NearTotalRecall(OVOSSkill):
         # Handle results
         if results:
             memory = results[0]  # Take the first match
-            full_memory = self.recall_full_memory(memory[2])  # Use timestamp or similar for recall
-            self.is_reciting = True  # MeePi is about to speak
-            self.speak_dialog("recite_memory", {"memory": full_memory})
-            self.is_reciting = False  # MeePi has finished speaking
+            memory_content = self.recall_full_memory(memory[2])  # Use timestamp or similar for recall
+
+            if memory_content:
+                dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
+                self.is_reciting = True
+                self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+                self.is_reciting = False
+            else:
+                self.speak_dialog("no_memory_found")
         else:
             self.speak_dialog("no_memory_found")
 
@@ -166,6 +182,7 @@ class NearTotalRecall(OVOSSkill):
         if self.is_reciting:
             self.speak("")  # Stop MeePi from talking
             self.is_reciting = False
+            self.speak_dialog("stopped_talking.dialog")  # Feedback
             self.log.info("MeePi was interrupted by user.")
             return True  # Indicate that MeePi stopped
         return False  # Nothing was interrupted
