@@ -158,8 +158,28 @@ class NearTotalRecall(OVOSSkill):
     def handle_do_you_recall_intent(self, message):
         query = message.data.get("query", "")
         self.log.info(f"Received query for recall: {query}")
+
         # Assuming you have a find_closest_memory method
         results = self.find_closest_memory(query)
+
+        # First check if there's an exact title match (case-insensitive)
+        if self.cleaned_data is not None:
+            title_matches = self.cleaned_data[
+                self.cleaned_data['Memory_Title'].str.lower() == query.lower()
+                ]
+
+            if not title_matches.empty:
+                # Found exact title match, get the first matching memory
+                memory_id = title_matches.iloc[0]['Timestamp']
+                memory_content = self.recall_full_memory(memory_id)
+
+                if memory_content:
+                    self.log.info(f"Found exact title match: {query}")
+                    dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
+                    self.is_reciting = True
+                    self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+                    self.is_reciting = False
+                    return  # Exit early as we've found and presented the memory
 
         # Handle results
         if results:
