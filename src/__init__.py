@@ -1,9 +1,8 @@
 from ovos_utils import classproperty
 from ovos_utils.process_utils import RuntimeRequirements
-# from ovos_workshop.intents import IntentBuilder
 from ovos_workshop.decorators import intent_handler
-# from ovos_workshop.intents import IntentHandler # Uncomment to use Adapt intents
 from ovos_workshop.skills import OVOSSkill
+
 import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -169,7 +168,8 @@ class NearTotalRecall(OVOSSkill):
                 self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.is_reciting = False
             else:
-                self.speak_dialog("no_memory_found")
+                # self.speak_dialog("no_memory_found")
+                return
             return  # Early return on exact match
 
         # Fallback to the closest match logic
@@ -186,9 +186,11 @@ class NearTotalRecall(OVOSSkill):
                 self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.is_reciting = False
             else:
-                self.speak_dialog("no_memory_found")
+                # self.speak_dialog("no_memory_found")
+                return
         else:
-            self.speak_dialog("no_memory_found")
+            # self.speak_dialog("no_memory_found")
+            return
 
     def stop(self):
         """ Action to take when "stop" is requested by the user.
