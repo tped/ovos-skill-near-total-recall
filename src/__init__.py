@@ -34,7 +34,7 @@ class NearTotalRecall(OVOSSkill):
         self.learning = True
         self.is_reciting = False  # Track if MeePi is currently babbling
 
-        #  Moved here suggested by AI
+        # Move here suggested by AI
         self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
         # Load settings from self.settings
