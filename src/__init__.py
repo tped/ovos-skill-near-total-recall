@@ -122,6 +122,10 @@ class NearTotalRecall(OVOSSkill):
         results = [(similarities[i], self.cleaned_data.iloc[i], self.cleaned_data.iloc[i]['Timestamp']) for i in
                    top_n_indices]
 
+        # If top match is below threshold, pretend nothing was found
+        if results and results[0][0] < self.similarity_threshold:
+            return []
+
         return results
 
     def recall_full_memory(self, memory_id):
