@@ -171,10 +171,10 @@ class NearTotalRecall(OVOSSkill):
                 self.is_reciting = True
                 self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.is_reciting = False
-                return True # Fallback Friendly 3
+                return True  # Fallback Friendly 3
             else:
                 # self.speak_dialog("no_memory_found")
-                return False # Fallback Friendly 3
+                return False  # Fallback Friendly 3
             # return  # Early return on exact match Removed for Fallback Friendliness
 
         # Fallback to the closest match logic
@@ -193,10 +193,10 @@ class NearTotalRecall(OVOSSkill):
                 return True  # Fallback Friendly 3
             else:
                 # self.speak_dialog("no_memory_found")
-                return False # Fallback Friendly 3
+                return False  # Fallback Friendly 3
         else:
             # self.speak_dialog("no_memory_found")
-            return False # Fallback Friendly 3
+            return False  # Fallback Friendly 3
 
     def stop(self):
         """ Action to take when "stop" is requested by the user.
@@ -207,4 +207,4 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("stopped_talking.dialog")  # Feedback
             self.log.info("MeePi was interrupted by user.")
             return True  # Indicate that MeePi stopped
-        return False  # Nothing was interrupted
+        return  # Nothing was interrupted
