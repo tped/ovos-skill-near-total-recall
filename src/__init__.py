@@ -13,6 +13,8 @@ DEFAULT_SETTINGS = {
     "cleaned_data_path": "/home/ovos/NTR-Data/cleaned_Memories.csv",
     "embeddings_path": "/home/ovos/NTR-Data/MeePi_embeddings.npy",
     "original_data_path": "/home/ovos/NTR-Data/MeePiMemories.csv",
+    "image_path": "/home/ovos/MeePi-Media/cover.jpg",
+    "display_image":  True,
 
     # Tuning parameters (from CONFIG in your Python script)
     "top_n": 5,  # Number of top results to return
@@ -41,7 +43,9 @@ class NearTotalRecall(OVOSSkill):
         self.cleaned_data_path = self.settings.get("cleaned_data_path")
         self.embeddings_path = self.settings.get("embeddings_path")
         self.original_data_path = self.settings.get("original_data_path")
+        self.image_path = self.settings.get("image_path")
 
+        self.display_image = self.settings.get("display_image")
         self.top_n = self.settings.get("top_n")
         self.similarity_threshold = self.settings.get("similarity_threshold")
         self.model_name = self.settings.get("model_name")
@@ -148,6 +152,10 @@ class NearTotalRecall(OVOSSkill):
         description = memory_row.iloc[0]['Memory_Description']
         is_long = cleaned_row.iloc[0].get("is_long_story", False) if not cleaned_row.empty else False
         has_summary = "Memory_Summary" in cleaned_row and not pd.isna(cleaned_row.iloc[0].get("Memory_Summary", None))
+
+        # Looks Like we will speak - display MeePi image
+        if self.display_image:
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit')
 
         # Warn the user and offer summary if available
         if is_long:
