@@ -37,7 +37,7 @@ class NearTotalRecall(OVOSSkill):
         self.is_reciting = False  # Track if MeePi is currently babbling
 
         # Move here suggested by AI
-        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+        # self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
         # Load settings from self.settings
         self.cleaned_data_path = self.settings.get("cleaned_data_path")
@@ -82,8 +82,7 @@ class NearTotalRecall(OVOSSkill):
     def initialize(self):
         # merge default settings
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
-        # self.settings.merge(DEFAULT_SETTINGS, new_only=True)
-        pass
+        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
     @classproperty
     def runtime_requirements(self):
