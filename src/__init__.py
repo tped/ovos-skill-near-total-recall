@@ -16,7 +16,7 @@ DEFAULT_SETTINGS = {
     "image_path": "/home/ovos/MeePi-Media/cover.jpg",
     "display_image":  True,
 
-    # Tuning parameters (from CONFIG in your Python script)
+    # Tuning parameters (from CONFIG in Python script)
     "top_n": 5,  # Number of top results to return
     "similarity_threshold": 0.5,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2"  # Embedding model
@@ -24,7 +24,8 @@ DEFAULT_SETTINGS = {
 
 
 class NearTotalRecall(OVOSSkill):
-    def __init__(self, *args, bus=None, **kwargs):
+    # def __init__(self, *args, bus=None, **kwargs):
+    def __init__(self, bus=None, skill_id=None, *args, **kwargs):
         """The __init__ method is called when the Skill is first constructed.
         Note that self.bus, self.skill_id, self.settings, and
         other base class settings are only available after the call to super().
@@ -32,12 +33,14 @@ class NearTotalRecall(OVOSSkill):
         This is a good place to load and pre-process any data needed by your
         Skill, ideally after the super() call.
         """
-        super().__init__(*args, bus=bus, **kwargs)
+        # super().__init__(*args, bus=bus, **kwargs)
+        super().__init__(bus=bus, skill_id=skill_id, *args, **kwargs)
+
         self.learning = True
         self.is_reciting = False  # Track if MeePi is currently babbling
 
         # Moved here suggested by dumb AI
-        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+        # self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
         # Load settings from self.settings
         self.cleaned_data_path = self.settings.get("cleaned_data_path")
@@ -82,8 +85,7 @@ class NearTotalRecall(OVOSSkill):
     def initialize(self):
         # merge default settings
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
-        # self.settings.merge(DEFAULT_SETTINGS, new_only=True)
-        pass
+        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
     @classproperty
     def runtime_requirements(self):
@@ -112,7 +114,7 @@ class NearTotalRecall(OVOSSkill):
         This method searches for the most similar memories based on the query using cosine similarity or other methods.
         """
         if self.cleaned_data is None or self.embeddings is None:
-            self.log.error("Cleaned data or embeddings not loaded.")
+            self.log.error("Cleaned data or Embeddings not loaded.")
             return []
 
         # Use the model to encode the query
@@ -151,7 +153,8 @@ class NearTotalRecall(OVOSSkill):
         # Extract details
         description = memory_row.iloc[0]['Memory_Description']
         is_long = cleaned_row.iloc[0].get("is_long_story", False) if not cleaned_row.empty else False
-        has_summary = "Memory_Summary" in cleaned_row and not pd.isna(cleaned_row.iloc[0].get("Memory_Summary", None))
+        has_summary = "Memory_Summary" in cleaned_row.columns \
+            and not pd.isna(cleaned_row.iloc[0].get("Memory_Summary", None))
 
         # Looks Like we will speak - display MeePi image
         if self.display_image:
