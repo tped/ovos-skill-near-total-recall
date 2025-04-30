@@ -53,30 +53,36 @@ class NearTotalRecall(OVOSSkill):
         self.similarity_threshold = self.settings.get("similarity_threshold")
         self.model_name = self.settings.get("model_name")
 
+        self.enabled = True  # an optimist!
+
         # Initialize with paths to the cleaned data and embeddings.
         try:
             self.cleaned_data = pd.read_csv(self.cleaned_data_path)
         except Exception as e:
             self.log.error(f"Failed to load cleaned data: {e}")
             self.cleaned_data = None  # Prevents crashes later
+            self.enabled = False
 
         try:
             self.embeddings = np.load(self.embeddings_path)
         except Exception as e:
             self.log.error(f"Failed to load embeddings: {e}")
             self.embeddings = None
+            self.enabled = False
 
         try:
             self.original_data = pd.read_csv(self.original_data_path)
         except Exception as e:
             self.log.error(f"Failed to load original data: {e}")
             self.original_data = None
+            self.enabled = False
 
         try:
             self.model = SentenceTransformer(self.model_name)
         except Exception as e:
             self.log.error(f"Failed to load Sentence Transformer model: {e}")
             self.model = None
+            self.enabled = False
 
         # Notify the user if something went wrong
         if None in [self.cleaned_data, self.embeddings, self.original_data, self.model]:
@@ -170,6 +176,10 @@ class NearTotalRecall(OVOSSkill):
 
     @intent_handler("DoYouRecall.intent")
     def handle_do_you_recall_intent(self, message):
+        if not self.enabled:
+            self.speak_dialog("ntr_disabled_due_to_error")
+            return
+
         query = message.data.get("query", "")
         self.log.info(f"Received query for recall: {query}")
 
