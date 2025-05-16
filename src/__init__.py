@@ -3,6 +3,7 @@ from ovos_utils.process_utils import RuntimeRequirements
 from ovos_workshop.decorators import intent_handler
 from ovos_workshop.skills import OVOSSkill
 
+import os
 import pandas as pd
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -14,7 +15,8 @@ DEFAULT_SETTINGS = {
     "embeddings_path": "/home/ovos/NTR-Data/MeePi_embeddings.npy",
     "original_data_path": "/home/ovos/NTR-Data/MeePiMemories.csv",
     "image_path": "/home/ovos/NTR-Data/cover.jpg",
-    "display_image":  True,
+    "media_folder": "/home/ovos/MeePi_Media",
+    "display_mee_image":  True,
     "fallback_friendly": False,  # True to quietly pass unknowns on to AI Brain
 
     # Tuning parameters (from CONFIG in Python script)
@@ -48,8 +50,9 @@ class NearTotalRecall(OVOSSkill):
         self.embeddings_path = self.settings.get("embeddings_path")
         self.original_data_path = self.settings.get("original_data_path")
         self.image_path = self.settings.get("image_path")
+        self.media_folder = self.settings.get("media_folder")
 
-        self.display_image = self.settings.get("display_image")
+        self.display_mee_image = self.settings.get("display_mee_image")
         self.fallback_on = self.settings.get("fallback_friendly")
         self.top_n = self.settings.get("top_n")
         self.similarity_threshold = self.settings.get("similarity_threshold")
@@ -85,6 +88,13 @@ class NearTotalRecall(OVOSSkill):
             self.log.error(f"Failed to load Sentence Transformer model: {e}")
             self.model = None
             self.enabled = False
+
+        if not os.path.isdir(self.media_folder):
+            self.log.error(f"Media folder does not exist: {self.media_folder}")
+            self.media_available = False
+            self.speak("Visuals disabled:  Media Folder does not exist")
+        else:
+            self.media_available = True
 
         # Notify the user if something went wrong
         if None in [self.cleaned_data, self.embeddings, self.original_data, self.model]:
@@ -167,7 +177,7 @@ class NearTotalRecall(OVOSSkill):
             and not pd.isna(cleaned_row.iloc[0].get("Memory_Summary", None))
 
         # Looks Like we will speak - display MeePi image
-        if self.display_image:
+        if self.display_mee_image:
             self.gui.show_image(self.image_path, fill='PreserveAspectFit')
 
         # Warn the user and offer summary if available
@@ -197,12 +207,12 @@ class NearTotalRecall(OVOSSkill):
                 self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.is_reciting = False
                 return True  # Fallback Friendly 3
-            else:
-                if self.fallback_on:
-                    return False  # Return False for Fallback Friendliness
-                else:
-                    self.speak_dialog("no_memory_found")
-                    return  # Early return on exact match
+            # else:
+            #    if self.fallback_on:
+            #        return False  # Return False for Fallback Friendliness
+            #    else:
+            #        self.speak_dialog("no_memory_found")
+            #        return  # Early return on exact match
 
         # Fallback to the closest match logic
         results = self.find_closest_memory(query)
