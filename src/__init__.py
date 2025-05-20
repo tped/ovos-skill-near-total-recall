@@ -101,6 +101,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"Initialization Complete")
+
     def initialize(self):
         # merge default settings
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
@@ -209,14 +210,8 @@ class NearTotalRecall(OVOSSkill):
                 self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.is_reciting = False
                 return True  # Fallback Friendly 3
-            # else:
-            #    if self.fallback_on:
-            #        return False  # Return False for Fallback Friendliness
-            #    else:
-            #        self.speak_dialog("no_memory_found")
-            #        return  # Early return on exact match
 
-        # Fallback to the closest match logic
+        # Fall-thru to find the closest match logic
         self.log.info(f"Finding closest memory for query: {query}")
         results = self.find_closest_memory(query)
 
@@ -234,18 +229,16 @@ class NearTotalRecall(OVOSSkill):
                 return True  # Fallback Friendly
             else:
                 self.log.info(f"RESULTS but NO CONTENT For query: {query}")
-                self.speak_dialog("no_memory_found")
-            #    if self.fallback_on:
-            #        return False  # quietly pass on this one Fallback Friendly
-            #    else:
-            # self.speak_dialog("no_memory_found")
+                if self.fallback_on:
+                    return False  # quietly pass on this one Fallback Friendly
+                else:
+                    self.speak_dialog("no_memory_found")
         else:
             self.log.info(f"NO RESULTS! For query: {query}")
-            self.speak_dialog("no_memory_found")
-        #    if self.fallback_on:
-        #        return False  # quietly pass on this one Fallback Friendly
-        #    else:
-        #   self.speak_dialog("no_memory_found")
+            if self.fallback_on:
+                return False  # quietly pass on this one Fallback Friendly
+            else:
+                self.speak_dialog("no_memory_found")
 
     def stop(self):
         """ Action to take when "stop" is requested by the user.
