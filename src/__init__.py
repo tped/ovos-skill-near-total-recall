@@ -229,15 +229,17 @@ class NearTotalRecall(OVOSSkill):
                 self.is_reciting = False
                 return True  # Fallback Friendly
             else:
-                if self.fallback_on:
-                    return False  # quietly pass on this one Fallback Friendly
-                else:
-                    self.speak_dialog("no_memory_found")
-        else:
-            if self.fallback_on:
-                return False  # quietly pass on this one Fallback Friendly
-            else:
                 self.speak_dialog("no_memory_found")
+            #    if self.fallback_on:
+            #        return False  # quietly pass on this one Fallback Friendly
+            #    else:
+            # self.speak_dialog("no_memory_found")
+        else:
+            self.speak_dialog("no_memory_found")
+        #    if self.fallback_on:
+        #        return False  # quietly pass on this one Fallback Friendly
+        #    else:
+        #   self.speak_dialog("no_memory_found")
 
     def stop(self):
         """ Action to take when "stop" is requested by the user.
