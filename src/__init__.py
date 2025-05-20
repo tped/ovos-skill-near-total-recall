@@ -38,7 +38,7 @@ class NearTotalRecall(OVOSSkill):
         """
         super().__init__(*args, bus=bus, **kwargs)
         # super().__init__(bus=bus, skill_id=skill_id, *args, **kwargs)
-
+        self.log.info(f"In __init__:  Just did super()")
         self.learning = True
         self.is_reciting = False  # Track if MeePi is currently babbling
 
@@ -100,6 +100,7 @@ class NearTotalRecall(OVOSSkill):
         if None in [self.cleaned_data, self.embeddings, self.original_data, self.model]:
             self.speak_dialog("error_initialization")
 
+        self.log.info(f"Initialization Complete")
     def initialize(self):
         # merge default settings
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
@@ -200,6 +201,7 @@ class NearTotalRecall(OVOSSkill):
         # Check for exact title match (case_insensitive)
         exact_match = self.cleaned_data[self.cleaned_data['Title'].str.lower() == query.lower()]
         if not exact_match.empty:
+            self.log.info(f"Found exact match for query: {query}")
             memory_content = self.recall_full_memory(exact_match.iloc[0]['Timestamp'])
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
@@ -215,10 +217,12 @@ class NearTotalRecall(OVOSSkill):
             #        return  # Early return on exact match
 
         # Fallback to the closest match logic
+        self.log.info(f"Finding closest memory for query: {query}")
         results = self.find_closest_memory(query)
 
         # Handle results
         if results:
+            self.log.info(f"RESULTS! For query: {query}")
             memory = results[0]  # Take the first match
             memory_content = self.recall_full_memory(memory[2])  # Use timestamp or similar for recall
 
@@ -229,12 +233,14 @@ class NearTotalRecall(OVOSSkill):
                 self.is_reciting = False
                 return True  # Fallback Friendly
             else:
+                self.log.info(f"RESULTS but NO CONTENT For query: {query}")
                 self.speak_dialog("no_memory_found")
             #    if self.fallback_on:
             #        return False  # quietly pass on this one Fallback Friendly
             #    else:
             # self.speak_dialog("no_memory_found")
         else:
+            self.log.info(f"NO RESULTS! For query: {query}")
             self.speak_dialog("no_memory_found")
         #    if self.fallback_on:
         #        return False  # quietly pass on this one Fallback Friendly
