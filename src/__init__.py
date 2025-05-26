@@ -4,16 +4,15 @@ from ovos_workshop.decorators import intent_handler
 from ovos_workshop.skills import OVOSSkill
 
 import os
-import pandas as pd
+import json
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
-    "cleaned_data_path": "/home/ovos/NTR-Data/cleaned_Memories.csv",
-    "embeddings_path": "/home/ovos/NTR-Data/MeePi_embeddings.npy",
-    "original_data_path": "/home/ovos/NTR-Data/MeePiMemories.csv",
+    "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings-0511.npy",
+    "memories_data_path": "/home/ovos/NTR-Data/MeePiMemories-0511.json",
     "image_path": "/home/ovos/NTR-Data/cover.jpg",
     "media_folder": "/home/ovos/MeePi_Media",
     "display_mee_image":  True,
@@ -32,9 +31,6 @@ class NearTotalRecall(OVOSSkill):
         """The __init__ method is called when the Skill is first constructed.
         Note that self.bus, self.skill_id, self.settings, and
         other base class settings are only available after the call to super().
-
-        This is a good place to load and pre-process any data needed by your
-        Skill, ideally after the super() call.
         """
         super().__init__(*args, bus=bus, **kwargs)
         # super().__init__(bus=bus, skill_id=skill_id, *args, **kwargs)
@@ -42,13 +38,37 @@ class NearTotalRecall(OVOSSkill):
         self.learning = True
         self.is_reciting = False  # Track if MeePi is currently babbling
 
-        # Moved here suggested by dumb AI
-        # self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+        self.enabled = True  # an optimist!
+
+        # These will be populated later
+        self.embeddings = None
+        self.memory_data = None
+        self.model = None
+        self.media_available = False
+
+        # Static paths and settings (may not change often)
+        self.embeddings_path = None
+        self.memories_data_path = None
+        self.image_path = None
+        self.media_folder = None
+
+        # Runtime tuning settings
+        self.top_n = None
+        self.similarity_threshold = None
+        self.model_name = None
+        self.display_mee_image = None
+        self.fallback_on = None
+
+    def initialize(self):
+        # merge default settings
+        # self.settings is a jsondb, which extends the dict class and adds helpers like merge
+        self.log.info("Initializing Near-Total-Recall Skill")
+        self.log.info(f"Skill ID: {self.skill_id}")
+        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
         # Load settings from self.settings
-        self.cleaned_data_path = self.settings.get("cleaned_data_path")
         self.embeddings_path = self.settings.get("embeddings_path")
-        self.original_data_path = self.settings.get("original_data_path")
+        self.memories_data_path = self.settings.get("memories_data_path")
         self.image_path = self.settings.get("image_path")
         self.media_folder = self.settings.get("media_folder")
 
@@ -58,15 +78,7 @@ class NearTotalRecall(OVOSSkill):
         self.similarity_threshold = self.settings.get("similarity_threshold")
         self.model_name = self.settings.get("model_name")
 
-        self.enabled = True  # an optimist!
-
-        # Initialize with paths to the cleaned data and embeddings.
-        try:
-            self.cleaned_data = pd.read_csv(self.cleaned_data_path)
-        except Exception as e:
-            self.log.error(f"Failed to load cleaned data: {e}")
-            self.cleaned_data = None  # Prevents crashes later
-            self.enabled = False
+        # Initialize with paths to the memory_bank and embeddings.
 
         try:
             self.embeddings = np.load(self.embeddings_path)
@@ -76,10 +88,12 @@ class NearTotalRecall(OVOSSkill):
             self.enabled = False
 
         try:
-            self.original_data = pd.read_csv(self.original_data_path)
+            with open(self.memories_data_path, 'r', encoding='utf-8') as f:
+                self.memory_data = json.load(f)
+            self.log.info(f"Loaded {len(self.memory_data)} memories from JSON.")
         except Exception as e:
-            self.log.error(f"Failed to load original data: {e}")
-            self.original_data = None
+            self.log.error(f"Failed to load memory JSON: {e}")
+            self.memory_data = None
             self.enabled = False
 
         try:
@@ -97,17 +111,14 @@ class NearTotalRecall(OVOSSkill):
             self.media_available = True
 
         # Notify the user if something went wrong
-        if None in [self.cleaned_data, self.embeddings, self.original_data, self.model]:
+        if None in [self.memory_data, self.embeddings, self.model]:
             self.speak_dialog("error_initialization")
 
         self.log.info(f"Initialization Complete")
 
-    def initialize(self):
-        # merge default settings
-        # self.settings is a jsondb, which extends the dict class and adds helpers like merge
-        self.log.info("Initializing Near-Total-Recall Skill")
-        self.log.info(f"Skill ID: {self.skill_id}")
-        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+    def on_settings_changed(self):
+        self.log.info("Settings have changed! Reloading dynamically...")
+        self.initialize()
 
     @classproperty
     def runtime_requirements(self):
@@ -135,7 +146,7 @@ class NearTotalRecall(OVOSSkill):
         """
         This method searches for the most similar memories based on the query using cosine similarity or other methods.
         """
-        if self.cleaned_data is None or self.embeddings is None:
+        if self.memory_data is None or self.embeddings is None:
             self.log.error("Cleaned data or Embeddings not loaded.")
             return []
 
@@ -147,7 +158,7 @@ class NearTotalRecall(OVOSSkill):
 
         # Find the top N most similar memories
         top_n_indices = np.argsort(similarities)[::-1][:self.top_n]
-        results = [(similarities[i], self.cleaned_data.iloc[i], self.cleaned_data.iloc[i]['Timestamp']) for i in
+        results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp']) for i in
                    top_n_indices]
 
         # If top match is below threshold, pretend nothing was found
@@ -161,22 +172,21 @@ class NearTotalRecall(OVOSSkill):
         This method retrieves the full memory details (e.g., from MeePiMemories.csv) using the memory ID.
         We'll also see if it is long-winded and offer a summary
         """
-        if self.original_data is None or self.cleaned_data is None:
+        if self.memory_data is None:
             self.log.error("Original data not loaded.")
             return None
 
         # Assuming memory_id corresponds to the 'Timestamp' or another unique field
-        memory_row = self.original_data[self.original_data['Timestamp'] == memory_id]
-        cleaned_row = self.cleaned_data[self.cleaned_data['Timestamp'] == memory_id]
+        # Find the memory dictionary with the matching timestamp
+        memory_row = [m for m in self.memory_data if m['Timestamp'] == memory_id]
 
-        if memory_row.empty:
-            return None  # Memory not found
+        if not memory_row:
+            return None  # No match found
 
         # Extract details
-        description = memory_row.iloc[0]['Memory_Description']
-        is_long = cleaned_row.iloc[0].get("is_long_story", False) if not cleaned_row.empty else False
-        has_summary = "Memory_Summary" in cleaned_row.columns \
-            and not pd.isna(cleaned_row.iloc[0].get("Memory_Summary", None))
+        description = memory_row[0]['Memory_Description']
+        is_long = memory_row[0].get("is_long_story", False) if not memory_row else False
+        has_summary = "Memory_Summary" in memory_row
 
         # Looks Like we will speak - display MeePi image
         if self.display_mee_image:
@@ -186,7 +196,7 @@ class NearTotalRecall(OVOSSkill):
         if is_long:
             response = self.get_response("long_story_warning")  # Ask user for choice
             if response and "summary" in response.lower() and has_summary:
-                return cleaned_row.iloc[0]["Memory_Summary"]  # Return summary
+                return memory_row[0]["Memory_Summary"]  # Return summary
 
         return description  # Default to full memory
 
@@ -200,10 +210,10 @@ class NearTotalRecall(OVOSSkill):
         self.log.info(f"Received query for recall: {query}")
 
         # Check for exact title match (case_insensitive)
-        exact_match = self.cleaned_data[self.cleaned_data['Title'].str.lower() == query.lower()]
-        if not exact_match.empty:
+        exact_match = [m for m in self.memory_data if m['Title'].lower() == query.lower()]
+        if exact_match:
             self.log.info(f"Found exact match for query: {query}")
-            memory_content = self.recall_full_memory(exact_match.iloc[0]['Timestamp'])
+            memory_content = self.recall_full_memory(exact_match[0]['Timestamp'])
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 self.is_reciting = True
