@@ -31,10 +31,10 @@ class NearTotalRecall(OVOSSkill):
         Note that self.bus, self.skill_id, self.settings, and
         other base class settings are only available after the call to super().
         """
-        super().__init__(*args, **kwargs)
+        # super().__init__(*args, **kwargs)
         # be aware that below is executed after `initialize`
 
-        self.log.info(f"In __init__:  Just did super()")
+        self.log.info(f"In __init__:  Initializing Variables ... no super() yet")
         self.learning = True
         self.enabled = False
         self.is_reciting = False  # Track if MeePi is currently babbling
@@ -57,6 +57,9 @@ class NearTotalRecall(OVOSSkill):
         self.model_name = None
         self.display_mee_image = None
         self.fallback_on = None
+
+        super().__init__(*args, **kwargs)
+        self.log.info(f"In __init__:  Just did super()")
 
     def initialize(self):
         self.log.info("Initializing Near-Total-Recall Skill")
