@@ -26,19 +26,18 @@ DEFAULT_SETTINGS = {
 
 
 class NearTotalRecall(OVOSSkill):
-    def __init__(self, *args, bus=None, **kwargs):
-        # def __init__(self, bus=None, skill_id=None, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         """The __init__ method is called when the Skill is first constructed.
         Note that self.bus, self.skill_id, self.settings, and
         other base class settings are only available after the call to super().
         """
-        super().__init__(*args, bus=bus, **kwargs)
-        # super().__init__(bus=bus, skill_id=skill_id, *args, **kwargs)
+        super().__init__(*args, **kwargs)
+        # be aware that below is executed after `initialize`
+
         self.log.info(f"In __init__:  Just did super()")
         self.learning = True
+        self.enabled = False
         self.is_reciting = False  # Track if MeePi is currently babbling
-
-        self.enabled = True  # an optimist!
 
         # These will be populated later
         self.embeddings = None
@@ -60,10 +59,14 @@ class NearTotalRecall(OVOSSkill):
         self.fallback_on = None
 
     def initialize(self):
-        # merge default settings
-        # self.settings is a jsondb, which extends the dict class and adds helpers like merge
         self.log.info("Initializing Near-Total-Recall Skill")
         self.log.info(f"Skill ID: {self.skill_id}")
+
+        # Initial Initialization
+        self.enabled = True  # an optimist!
+
+        # merge default settings
+        # self.settings is a jsondb, which extends the dict class and adds helpers like merge
         self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
         # Load settings from self.settings
@@ -111,7 +114,7 @@ class NearTotalRecall(OVOSSkill):
             self.media_available = True
 
         # Notify the user if something went wrong
-        if None in [self.memory_data, self.embeddings, self.model]:
+        if self.memory_data is None or self.embeddings is None or self.model is None:
             self.speak_dialog("error_initialization")
 
         self.log.info(f"Initialization Complete")
