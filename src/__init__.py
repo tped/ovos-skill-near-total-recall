@@ -26,16 +26,18 @@ DEFAULT_SETTINGS = {
 
 
 class NearTotalRecall(OVOSSkill):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, bus=None, **kwargs):
         """The __init__ method is called when the Skill is first constructed.
         Note that self.bus, self.skill_id, self.settings, and
         other base class settings are only available after the call to super().
-        """
-        # super().__init__(*args, **kwargs)
-        # be aware that below is executed after `initialize`
 
-        self.log.info(f"In __init__:  Initializing Variables ... no super() yet")
+        This is a good place to load and pre-process any data needed by your
+        Skill, ideally after the super() call.
+        """
+        super().__init__(*args, bus=bus, **kwargs)
         self.learning = True
+
+        self.log.info(f"In __init__:  Initializing Variables ... super() just called")
         self.enabled = False
         self.is_reciting = False  # Track if MeePi is currently babbling
 
@@ -58,19 +60,14 @@ class NearTotalRecall(OVOSSkill):
         self.display_mee_image = None
         self.fallback_on = None
 
-        super().__init__(*args, **kwargs)
-        self.log.info(f"In __init__:  Just did super()")
+        self.log.info(f"Done with __init__")
 
-    def initialize(self):
-        self.log.info("Initializing Near-Total-Recall Skill")
+    def load_databanks(self):
+        self.log.info("Initializing Near-Total-Recall Memory Banks")
         self.log.info(f"Skill ID: {self.skill_id}")
 
         # Initial Initialization
         self.enabled = True  # an optimist!
-
-        # merge default settings
-        # self.settings is a jsondb, which extends the dict class and adds helpers like merge
-        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
         # Load settings from self.settings
         self.embeddings_path = self.settings.get("embeddings_path")
@@ -122,9 +119,10 @@ class NearTotalRecall(OVOSSkill):
 
         self.log.info(f"Initialization Complete")
 
-    def on_settings_changed(self):
-        self.log.info("Settings have changed! Reloading dynamically...")
-        self.initialize()
+    def initialize(self):
+        # merge default settings
+        # self.settings is a jsondb, which extends the dict class and adds helpers like merge
+        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
 
     @classproperty
     def runtime_requirements(self):
