@@ -60,6 +60,8 @@ class NearTotalRecall(OVOSSkill):
         self.display_mee_image = None
         self.fallback_on = None
 
+        self.load_databanks()
+
         self.log.info(f"Done with __init__")
 
     def load_databanks(self):
