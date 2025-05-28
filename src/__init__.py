@@ -189,10 +189,13 @@ class NearTotalRecall(OVOSSkill):
         if not memory_row:
             return None  # No match found
 
+        # We CAN remember!
+        memory = memory_row[0]
+
         # Extract details
-        description = memory_row[0]['Memory_Description']
-        is_long = memory_row[0].get("is_long_story", False) if not memory_row else False
-        has_summary = "Memory_Summary" in memory_row
+        description = memory['Memory_Description']
+        is_long = memory.get("is_long_story", False)
+        has_summary = bool(memory.get("Memory_Summary"))
 
         # Looks Like we will speak - display MeePi image
         if self.display_mee_image:
@@ -202,7 +205,7 @@ class NearTotalRecall(OVOSSkill):
         if is_long:
             response = self.get_response("long_story_warning")  # Ask user for choice
             if response and "summary" in response.lower() and has_summary:
-                return memory_row[0]["Memory_Summary"]  # Return summary
+                return memory["Memory_Summary"]  # Return summary
 
         return description  # Default to full memory
 
