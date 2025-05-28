@@ -66,7 +66,7 @@ class NearTotalRecall(OVOSSkill):
 
     def load_databanks(self):
         self.log.info("Initializing Near-Total-Recall Memory Banks")
-        self.log.info(f"Skill ID: {self.skill_id}")
+        # self.log.info(f"Skill ID: {self.skill_id}")
 
         # Initial Initialization
         self.enabled = True  # an optimist!
