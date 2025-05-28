@@ -26,7 +26,7 @@ DEFAULT_SETTINGS = {
 
 
 class NearTotalRecall(OVOSSkill):
-    def __init__(self, *args, bus=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """The __init__ method is called when the Skill is first constructed.
         Note that self.bus, self.skill_id, self.settings, and
         other base class settings are only available after the call to super().
@@ -34,7 +34,7 @@ class NearTotalRecall(OVOSSkill):
         This is a good place to load and pre-process any data needed by your
         Skill, ideally after the super() call.
         """
-        super().__init__(*args, bus=bus, **kwargs)
+        super().__init__(*args, **kwargs)
         self.learning = True
 
         self.log.info(f"In __init__:  Initializing Variables ... super() just called")
