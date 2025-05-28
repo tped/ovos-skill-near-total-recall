@@ -19,8 +19,7 @@
             "ovos-bus-client",
             "ovos-plugin-manager",
             "ovos-utils",
-            "ovos-workshop",
-            "pandas"
+            "ovos-workshop"
         ],
         "system": {},
         "skill": []
