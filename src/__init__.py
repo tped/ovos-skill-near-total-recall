@@ -104,9 +104,9 @@ class NearTotalRecall(OVOSSkill):
             self.enabled = False
 
         if not os.path.isdir(self.media_folder):
-            self.log.error(f"Media folder does not exist: {self.media_folder}")
+            self.log.warning(f"Media folder does not exist: {self.media_folder}")
             self.media_available = False
-            self.speak("Visuals disabled:  Media Folder does not exist")
+            self.speak("Memory Palace disabled:  Media Folder does not exist")
         else:
             self.media_available = True
 
