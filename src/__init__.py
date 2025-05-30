@@ -26,18 +26,9 @@ DEFAULT_SETTINGS = {
 
 
 class NearTotalRecall(OVOSSkill):
-    def __init__(self, *args, **kwargs):
-        """The __init__ method is called when the Skill is first constructed.
-        Note that self.bus, self.skill_id, self.settings, and
-        other base class settings are only available after the call to super().
+    def initialize(self):
 
-        This is a good place to load and pre-process any data needed by your
-        Skill, ideally after the super() call.
-        """
-        super().__init__(*args, **kwargs)
-        self.learning = True
-
-        self.log.info(f"In __init__:  Initializing Variables ... super() just called")
+        self.log.info(f"Initializing Variables ...")
         self.enabled = False
         self.is_reciting = False  # Track if MeePi is currently babbling
 
@@ -60,9 +51,13 @@ class NearTotalRecall(OVOSSkill):
         self.display_mee_image = None
         self.fallback_on = None
 
+        # merge default settings
+        # self.settings is a jsondb, which extends the dict class and adds helpers like merge
+        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+
         self.load_databanks()
 
-        self.log.info(f"Done with __init__")
+        self.log.info(f"Done with Initialize")
 
     def load_databanks(self):
         self.log.info("Initializing Near-Total-Recall Memory Banks")
@@ -119,12 +114,7 @@ class NearTotalRecall(OVOSSkill):
         if self.memory_data is None or self.embeddings is None or self.model is None:
             self.speak_dialog("error_initialization")
 
-        self.log.info(f"Initialization Complete")
-
-    def initialize(self):
-        # merge default settings
-        # self.settings is a jsondb, which extends the dict class and adds helpers like merge
-        self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+        self.log.info(f"MeePi Databank Initialization Complete")
 
     @classproperty
     def runtime_requirements(self):
