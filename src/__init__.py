@@ -11,8 +11,8 @@ from sentence_transformers import SentenceTransformer
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
-    "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings-0511.npy",
-    "memories_data_path": "/home/ovos/NTR-Data/MeePiMemories-0511.json",
+    "embeddings_path": "/home/ovos/NTR-Data/0530-MeePiEmbeddings.npy",
+    "memories_data_path": "/home/ovos/NTR-Data/0530-MeePiMemories.json",
     "image_path": "/home/ovos/NTR-Data/cover.jpg",
     "media_folder": "/home/ovos/MeePi_Media",
     "display_mee_image":  True,
@@ -28,7 +28,7 @@ DEFAULT_SETTINGS = {
 class NearTotalRecall(OVOSSkill):
     def initialize(self):
 
-        self.log.info(f"Initializing Variables ...")
+        self.log.info(f"Initializing Variables ... to be safe")
         self.enabled = False
         self.is_reciting = False  # Track if MeePi is currently babbling
 
