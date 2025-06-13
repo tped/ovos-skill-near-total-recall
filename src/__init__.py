@@ -5,14 +5,16 @@ from ovos_workshop.skills import OVOSSkill
 
 import os
 import json
+import re
+from datetime import datetime
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
-    "embeddings_path": "/home/ovos/NTR-Data/0530-MeePiEmbeddings.npy",
-    "memories_data_path": "/home/ovos/NTR-Data/0530-MeePiMemories.json",
+    "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings.npy",
+    "memories_data_path": "/home/ovos/NTR-Data/MeePiMemories.json",
     "image_path": "/home/ovos/NTR-Data/cover.jpg",
     "media_folder": "/home/ovos/MeePi_Media",
     "display_mee_image":  True,
@@ -20,7 +22,7 @@ DEFAULT_SETTINGS = {
 
     # Tuning parameters (from CONFIG in Python script)
     "top_n": 5,  # Number of top results to return
-    "similarity_threshold": 0.5,  # Minimum similarity score to consider a match
+    "similarity_threshold": 0.35,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2"  # Embedding model
 }
 
@@ -187,9 +189,26 @@ class NearTotalRecall(OVOSSkill):
         is_long = memory.get("is_long_story", False)
         has_summary = bool(memory.get("Memory_Summary"))
 
-        # Looks Like we will speak - display MeePi image
+        # Try showing media cover.jpg if available
         if self.display_mee_image:
-            self.gui.show_image(self.image_path, fill='PreserveAspectFit')
+            cover_displayed = False
+            if self.media_available:
+                try:
+                    ts = datetime.strptime(memory['Timestamp'], "%m/%d/%Y %H:%M:%S").strftime("%Y%m%d%H%M%S")
+                    title_fragment = memory.get("Title", "untitled")[:30]
+                    title_fragment = re.sub(r"[^a-zA-Z0-9_\-]", "_", title_fragment).lower()
+                    folder_name = f"{ts}_{title_fragment}"
+                    cover_path = os.path.join(self.media_folder, folder_name, "cover.jpg")
+
+                    if os.path.isfile(cover_path):
+                        self.gui.show_image(cover_path, fill='PreserveAspectFit')
+                        cover_displayed = True
+                        self.log.info(f"Displayed cover.jpg for {folder_name}")
+                except Exception as e:
+                    self.log.warning(f"Error checking/displaying cover.jpg: {e}")
+
+            if not cover_displayed:
+                self.gui.show_image(self.image_path, fill='PreserveAspectFit')
 
         # Warn the user and offer summary if available
         if is_long:
