@@ -190,24 +190,30 @@ class NearTotalRecall(OVOSSkill):
         has_summary = bool(memory.get("Memory_Summary"))
 
         # Try showing media cover.jpg if available
-        if self.display_mee_image:
-            cover_displayed = False
-            if self.media_available:
-                try:
-                    ts = datetime.strptime(memory['Timestamp'], "%m/%d/%Y %H:%M:%S").strftime("%Y%m%d%H%M%S")
-                    title_fragment = memory.get("Title", "untitled")[:30]
-                    title_fragment = re.sub(r"[^a-zA-Z0-9_\-]", "_", title_fragment).lower()
-                    folder_name = f"{ts}_{title_fragment}"
-                    cover_path = os.path.join(self.media_folder, folder_name, "cover.jpg")
+        # Image logic
+        if self.media_available:
+            try:
+                dt_obj = datetime.strptime(memory_id, "%m/%d/%Y %H:%M:%S")
+                folder_prefix = dt_obj.strftime("%Y%m%d%H%M%S")
+                title_fragment = re.sub(r"[^a-zA-Z0-9_\-]", "_", memory.get("Title", "")[:30]).lower()
+                full_folder_path = os.path.join(self.media_folder, f"{folder_prefix}_{title_fragment}")
+                image_path = os.path.join(full_folder_path, "cover.jpg")
 
-                    if os.path.isfile(cover_path):
-                        self.gui.show_image(cover_path, fill='PreserveAspectFit')
-                        cover_displayed = True
-                        self.log.info(f"Displayed cover.jpg for {folder_name}")
-                except Exception as e:
-                    self.log.warning(f"Error checking/displaying cover.jpg: {e}")
-
-            if not cover_displayed:
+                self.log.info(f"Looking for cover.jpg at: {image_path}")
+                if os.path.isfile(image_path):
+                    self.log.info("✅ Found cover.jpg — displaying it.")
+                    self.gui.show_image(image_path, fill='PreserveAspectFit')
+                else:
+                    self.log.warning("❌ cover.jpg not found, falling back to MeePi default.")
+                    if self.display_mee_image:
+                        self.gui.show_image(self.image_path, fill='PreserveAspectFit')
+            except Exception as e:
+                self.log.error(f"Exception during image selection: {e}")
+                if self.display_mee_image:
+                    self.gui.show_image(self.image_path, fill='PreserveAspectFit')
+        else:
+            if self.display_mee_image:
+                self.log.info("Media not available, showing MeePi fallback image.")
                 self.gui.show_image(self.image_path, fill='PreserveAspectFit')
 
         # Warn the user and offer summary if available
