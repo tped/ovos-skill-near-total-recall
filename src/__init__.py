@@ -280,6 +280,13 @@ class NearTotalRecall(OVOSSkill):
             else:
                 self.speak_dialog("no_memory_found")
 
+    @intent_handler("ThanksCatcher.intent")
+    def handle_gratitude_poltergeist(self, message):
+        self.log.info("🩹 Caught stray 'thank you' — likely OVOS bug.")
+        # THIS IS A KLUDGE ... catch strays
+        # MeePI Says NOTHING, Knows NOTHING, Does NOTHING
+        # Just don't EVER thank MeePI
+
     def stop(self):
         """ Action to take when "stop" is requested by the user.
         """
