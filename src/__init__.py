@@ -5,7 +5,6 @@ from ovos_workshop.skills import OVOSSkill
 
 import os
 import json
-import re
 from datetime import datetime
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -15,7 +14,7 @@ from sentence_transformers import SentenceTransformer
 DEFAULT_SETTINGS = {
     "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings.npy",
     "memories_data_path": "/home/ovos/NTR-Data/MeePiMemories.json",
-    "image_path": "/home/ovos/NTR-Data/cover.jpg",
+    "mee_image_path": "/home/ovos/NTR-Data/cover.jpg",
     "media_folder": "/home/ovos/MeePi_Media",
     "display_mee_image":  True,
     "fallback_friendly": False,  # True to quietly pass unknowns on to AI Brain
@@ -71,7 +70,7 @@ class NearTotalRecall(OVOSSkill):
         # Load settings from self.settings
         self.embeddings_path = self.settings.get("embeddings_path")
         self.memories_data_path = self.settings.get("memories_data_path")
-        self.image_path = self.settings.get("image_path")
+        self.image_path = self.settings.get("mee_image_path")
         self.media_folder = self.settings.get("media_folder")
 
         self.display_mee_image = self.settings.get("display_mee_image")
@@ -165,6 +164,30 @@ class NearTotalRecall(OVOSSkill):
 
         return results
 
+    def display_cover_image(self, memory):
+        """If a cover.jpg exists for the memory, show it on the GUI."""
+        raw_timestamp = memory.get("Timestamp", "")
+        title = memory.get("Title", "").lower().replace(" ", "_")
+
+        # Convert human-readable timestamp to sortable format
+        try:
+            dt_obj = datetime.strptime(raw_timestamp, "%m/%d/%Y %H:%M:%S")
+            sortable_ts = dt_obj.strftime("%Y%m%d%H%M%S")
+        except Exception as e:
+            self.log.warning(f"Could not parse timestamp '{raw_timestamp}': {e}")
+            sortable_ts = "unknown_time"
+
+        # Build the expected folder path
+        folder_name = f"{sortable_ts}_{title}"
+        cover_path = os.path.join(self.media_folder, folder_name, "cover.jpg")
+
+        self.log.info(f"Looking for cover.jpg at: {cover_path}")
+        if os.path.exists(cover_path):
+            self.gui.show_image(cover_path, fill='PreserveAspectFit')
+            self.log.info("✅ Found cover.jpg — displaying it.")
+        else:
+            self.log.info("❌ No cover.jpg found for this memory.")
+
     def recall_full_memory(self, memory_id):
         """
         This method retrieves the full memory details (e.g., from MeePiMemories.csv) using the memory ID.
@@ -184,37 +207,14 @@ class NearTotalRecall(OVOSSkill):
         # We CAN remember!
         memory = memory_row[0]
 
+        # Project image of MeeSelf (if option set)
+        if self.display_mee_image:
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit')
+
         # Extract details
         description = memory['Memory_Description']
         is_long = memory.get("is_long_story", False)
         has_summary = bool(memory.get("Memory_Summary"))
-
-        # Try showing media cover.jpg if available
-        # Image logic
-        if self.media_available:
-            try:
-                dt_obj = datetime.strptime(memory_id, "%m/%d/%Y %H:%M:%S")
-                folder_prefix = dt_obj.strftime("%Y%m%d%H%M%S")
-                title_fragment = re.sub(r"[^a-zA-Z0-9_\-]", "_", memory.get("Title", "")[:30]).lower()
-                full_folder_path = os.path.join(self.media_folder, f"{folder_prefix}_{title_fragment}")
-                image_path = os.path.join(full_folder_path, "cover.jpg")
-
-                self.log.info(f"Looking for cover.jpg at: {image_path}")
-                if os.path.isfile(image_path):
-                    self.log.info("✅ Found cover.jpg — displaying it.")
-                    self.gui.show_image(image_path, fill='PreserveAspectFit')
-                else:
-                    self.log.warning("❌ cover.jpg not found, falling back to MeePi default.")
-                    if self.display_mee_image:
-                        self.gui.show_image(self.image_path, fill='PreserveAspectFit')
-            except Exception as e:
-                self.log.error(f"Exception during image selection: {e}")
-                if self.display_mee_image:
-                    self.gui.show_image(self.image_path, fill='PreserveAspectFit')
-        else:
-            if self.display_mee_image:
-                self.log.info("Media not available, showing MeePi fallback image.")
-                self.gui.show_image(self.image_path, fill='PreserveAspectFit')
 
         # Warn the user and offer summary if available
         if is_long:
@@ -237,10 +237,13 @@ class NearTotalRecall(OVOSSkill):
         exact_match = [m for m in self.memory_data if m['Title'].lower() == query.lower()]
         if exact_match:
             self.log.info(f"Found exact match for query: {query}")
+            memory_dict = exact_match[0]  # <== ADDED: give it a name for clarity
             memory_content = self.recall_full_memory(exact_match[0]['Timestamp'])
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 self.is_reciting = True
+                if self.media_available:
+                    self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
                 self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.is_reciting = False
                 return True  # Fallback Friendly 3
@@ -252,12 +255,15 @@ class NearTotalRecall(OVOSSkill):
         # Handle results
         if results:
             self.log.info(f"RESULTS! For query: {query}")
-            memory = results[0]  # Take the first match
-            memory_content = self.recall_full_memory(memory[2])  # Use timestamp or similar for recall
+            similarity, memory_dict, memory_id = results[0]  # <== CLARIFIED
+            # memory = results[0]  # Take the first match
+            memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
 
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 self.is_reciting = True
+                if self.media_available:  # <== ADDED check
+                    self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
                 self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.is_reciting = False
                 return True  # Fallback Friendly
