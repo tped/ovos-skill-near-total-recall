@@ -163,10 +163,8 @@ class NearTotalRecall(OVOSSkill):
                     self.memory_data[i].get("Title", "")) for i in top_n_indices]
 
         self.log.info("📊 Top memory matches:")
-        for rank, (score, memory, _) in enumerate(results, start=1):
-            # Use actual title from memory dict
-            title = memory.get("Title", "unknown title")
-            self.log.info(f"  {rank}. Title: '{title}' | Score: {score:.4f}")
+        for rank, (score, memory, memory_id, memory_title) in enumerate(results, start=1):
+            self.log.info(f"  {rank}. Title: '{memory_title}' | Score: {score:.4f}")
 
         # If top match is below threshold, pretend nothing was found
         if results and results[0][0] < self.similarity_threshold:
@@ -265,7 +263,7 @@ class NearTotalRecall(OVOSSkill):
         # Handle results
         if results:
             self.log.info(f"RESULTS! For query: {query}")
-            similarity, memory_dict, memory_id, memory_title = results[0]  # <== CLARIFIED
+            similarity, memory_dict, memory_id, memory_title = results[0]  # <== CLARIFIED/FIXED
             self.log.info(f"🧠 Best match: '{memory_title}' (Score: {similarity:.4f})")
 
             # memory = results[0]  # Take the first match
