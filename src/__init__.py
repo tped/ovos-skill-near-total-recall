@@ -147,6 +147,8 @@ class NearTotalRecall(OVOSSkill):
             self.log.error("Cleaned data or Embeddings not loaded.")
             return []
 
+        self.log.info(f"🔍 Finding closest memory for query: '{query}'")
+
         # Use the model to encode the query
         query_embedding = self.model.encode([query])
 
@@ -157,6 +159,10 @@ class NearTotalRecall(OVOSSkill):
         top_n_indices = np.argsort(similarities)[::-1][:self.top_n]
         results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp']) for i in
                    top_n_indices]
+
+        self.log.info("📊 Top memory matches:")
+        for rank, (score, memory, title) in enumerate(results, start=1):
+            self.log.info(f"  {rank}. Title: '{title}' | Score: {score:.4f}")
 
         # If top match is below threshold, pretend nothing was found
         if results and results[0][0] < self.similarity_threshold:
