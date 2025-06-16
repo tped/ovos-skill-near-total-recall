@@ -157,11 +157,15 @@ class NearTotalRecall(OVOSSkill):
 
         # Find the top N most similar memories
         top_n_indices = np.argsort(similarities)[::-1][:self.top_n]
-        results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp']) for i in
-                   top_n_indices]
+        # OLD results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp']) for i in
+        # OLD            top_n_indices]
+        results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp'],
+                    self.memory_data[i].get("Title", "")) for i in top_n_indices]
 
         self.log.info("📊 Top memory matches:")
-        for rank, (score, memory, title) in enumerate(results, start=1):
+        for rank, (score, memory, _) in enumerate(results, start=1):
+            # Use actual title from memory dict
+            title = memory.get("Title", "unknown title")
             self.log.info(f"  {rank}. Title: '{title}' | Score: {score:.4f}")
 
         # If top match is below threshold, pretend nothing was found
@@ -261,7 +265,9 @@ class NearTotalRecall(OVOSSkill):
         # Handle results
         if results:
             self.log.info(f"RESULTS! For query: {query}")
-            similarity, memory_dict, memory_id = results[0]  # <== CLARIFIED
+            similarity, memory_dict, memory_id, memory_title = results[0]  # <== CLARIFIED
+            self.log.info(f"🧠 Best match: '{memory_title}' (Score: {similarity:.4f})")
+
             # memory = results[0]  # Take the first match
             memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
 
