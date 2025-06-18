@@ -21,7 +21,7 @@ DEFAULT_SETTINGS = {
 
     # Tuning parameters (from CONFIG in Python script)
     "top_n": 5,  # Number of top results to return
-    "similarity_threshold": 0.35,  # Minimum similarity score to consider a match
+    "similarity_threshold": 0.32,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2"  # Embedding model
 }
 
@@ -83,11 +83,6 @@ class NearTotalRecall(OVOSSkill):
 
         try:
             self.embeddings = np.load(self.embeddings_path)
-            # ✅ Normalize memory embeddings (unit vectors for cosine similarity)
-            norms = np.linalg.norm(self.embeddings, axis=1, keepdims=True)
-            if np.any(norms == 0):
-                self.log.warning("Zero-norm vectors found in memory embeddings. Check your data.")
-            self.embeddings = self.embeddings / norms
         except Exception as e:
             self.log.error(f"Failed to load embeddings: {e}")
             self.embeddings = None
@@ -155,11 +150,7 @@ class NearTotalRecall(OVOSSkill):
         self.log.info(f"🔍 Finding closest memory for query: '{query}'")
 
         # OLD Use the model to encode the query
-        # OLD query_embedding = self.model.encode([query])
-
-        # NEW Get just the vector for better similarities
-        query_embedding = self.model.encode([query])[0]  # Get just the vector
-        query_embedding = query_embedding / np.linalg.norm(query_embedding)
+        query_embedding = self.model.encode([query])
 
         # Compute similarity between query and all memory embeddings
         similarities = np.dot(self.embeddings, query_embedding.T).flatten()
