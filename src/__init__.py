@@ -173,7 +173,7 @@ class NearTotalRecall(OVOSSkill):
         return results
 
     def display_cover_image(self, memory):
-        """If a cover.jpg exists for the memory, show it on the GUI."""
+        """If a cover image exists for the memory, show it on the GUI."""
         raw_timestamp = memory.get("Timestamp", "")
         title = memory.get("Title", "").lower().replace(" ", "_")
 
@@ -185,16 +185,18 @@ class NearTotalRecall(OVOSSkill):
             self.log.warning(f"Could not parse timestamp '{raw_timestamp}': {e}")
             sortable_ts = "unknown_time"
 
-        # Build the expected folder path
         folder_name = f"{sortable_ts}_{title}"
-        cover_path = os.path.join(self.media_folder, folder_name, "cover.jpg")
+        folder_path = os.path.join(self.media_folder, folder_name)
 
-        self.log.info(f"Looking for cover.jpg at: {cover_path}")
-        if os.path.exists(cover_path):
-            self.gui.show_image(cover_path, fill='PreserveAspectFit')
-            self.log.info("✅ Found cover.jpg — displaying it.")
-        else:
-            self.log.info("❌ No cover.jpg found for this memory.")
+        # Look for the first valid cover image
+        for ext in [".jpg", ".jpeg", ".png"]:
+            cover_path = os.path.join(folder_path, f"cover{ext}")
+            if os.path.exists(cover_path):
+                self.gui.show_image(cover_path, fill='PreserveAspectFit')
+                self.log.info(f"✅ Found cover image ({cover_path}) — displaying it.")
+                return
+
+        self.log.info("❌ No cover image (jpg/jpeg/png) found for this memory.")
 
     def recall_full_memory(self, memory_id):
         """
