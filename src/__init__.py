@@ -5,6 +5,7 @@ from ovos_workshop.skills import OVOSSkill
 
 import os
 import json
+import random
 from datetime import datetime
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -299,6 +300,35 @@ class NearTotalRecall(OVOSSkill):
             era_summary = era_list[0]
 
         self.speak(f"I have {total_memories} memories: {era_summary}.")
+        return
+
+    @intent_handler("RandomMemory.intent")
+    def handle_random_memory_intent(self, message):
+        if not self.enabled:
+            self.speak_dialog("ntr_disabled_due_to_error")
+            return
+
+        # Pick a random memory
+        memory = random.choice(self.memory_data)
+        memory_id = memory["Timestamp"]
+
+        # memory = results[0]  # Take the first match
+        memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
+
+        if memory_content:
+            dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
+            self.is_reciting = True
+            if self.media_available:  # <== ADDED check
+                self.display_cover_image(memory)  # <== FIXED: pass full dict
+            self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+            self.is_reciting = False
+            return True  # Fallback Friendly
+        else:
+            self.log.info(f"RESULTS but NO CONTENT For Random Memory")
+            if self.fallback_on:
+                return False  # quietly pass on this one Fallback Friendly
+            else:
+                self.speak_dialog("no_memory_found")
         return
 
     @intent_handler("ThanksCatcher.intent")
