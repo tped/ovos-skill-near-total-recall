@@ -13,7 +13,7 @@ from sentence_transformers import SentenceTransformer
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
     "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings.npy",
-    "memories_data_path": "/home/ovos/NTR-Data/MeePiMemories.json",
+    "memories_data_path": "/home/ovos/NTR-Data/MeePiMemoryBank.json",
     "mee_image_path": "/home/ovos/NTR-Data/cover.jpg",
     "media_folder": "/home/ovos/MeePi_Media",
     "display_mee_image":  True,
