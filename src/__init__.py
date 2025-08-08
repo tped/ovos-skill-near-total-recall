@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 import numpy as np
 from sentence_transformers import SentenceTransformer
-
+from collections import Counter
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
@@ -27,30 +27,16 @@ DEFAULT_SETTINGS = {
 
 
 class NearTotalRecall(OVOSSkill):
+    def __init__(self, *args, **kwargs):
+        """The __init__ method is called when the Skill is first constructed.
+        Note that self.bus, self.skill_id, self.settings, and
+        other base class settings are only available after the call to super().
+        """
+        super().__init__(*args, **kwargs)
+        self.learning = True
+        self.is_reciting = False
+
     def initialize(self):
-
-        self.log.info(f"Initializing Variables ... to be safe")
-        self.enabled = False
-        self.is_reciting = False  # Track if MeePi is currently babbling
-
-        # These will be populated later
-        self.embeddings = None
-        self.memory_data = None
-        self.model = None
-        self.media_available = False
-
-        # Static paths and settings (may not change often)
-        self.embeddings_path = None
-        self.memories_data_path = None
-        self.image_path = None
-        self.media_folder = None
-
-        # Runtime tuning settings
-        self.top_n = None
-        self.similarity_threshold = None
-        self.model_name = None
-        self.display_mee_image = None
-        self.fallback_on = None
 
         # merge default settings
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
@@ -291,6 +277,29 @@ class NearTotalRecall(OVOSSkill):
                 return False  # quietly pass on this one Fallback Friendly
             else:
                 self.speak_dialog("no_memory_found")
+
+    @intent_handler("MemoryChecker.intent")
+    def handle_memory_checker_intent(self, message):
+        self.speak("Checking MeePi Memory Banks")
+        total_memories = len(self.memory_data)
+        era_counts = Counter(m.get("Era", "Unknown") or "Unknown" for m in self.memory_data)
+
+        # Build formatted era list
+        era_list = []
+        for era, count in era_counts.items():
+            if era.lower() == "unknown":
+                era_list.append(f"{count} with no era assigned")
+            else:
+                era_list.append(f"{count} from {era}")
+
+        # Combine into natural-sounding string
+        if len(era_list) > 1:
+            era_summary = ", ".join(era_list[:-1]) + f", and {era_list[-1]}"
+        else:
+            era_summary = era_list[0]
+
+        self.speak(f"I have {total_memories} memories: {era_summary}.")
+        return
 
     @intent_handler("ThanksCatcher.intent")
     def handle_gratitude_poltergeist(self, message):
