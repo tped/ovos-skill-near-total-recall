@@ -316,6 +316,7 @@ class NearTotalRecall(OVOSSkill):
         memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
 
         if memory_content:
+            self.speak_dialog("random_memory", {"era": memory_content})
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             self.is_reciting = True
             if self.media_available:  # <== ADDED check
