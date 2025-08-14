@@ -4,8 +4,10 @@ from ovos_workshop.decorators import intent_handler
 from ovos_workshop.skills import OVOSSkill
 
 import os
+import re
 import json
 import random
+import time
 from datetime import datetime
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -20,10 +22,11 @@ DEFAULT_SETTINGS = {
     "display_mee_image":  True,
     "fallback_friendly": False,  # True to quietly pass unknowns on to AI Brain
 
-    # Tuning parameters (from CONFIG in Python script)
+    # Tuning parameters
     "top_n": 5,  # Number of top results to return
     "similarity_threshold": 0.32,  # Minimum similarity score to consider a match
-    "model_name": "all-MiniLM-L6-v2"  # Embedding model
+    "model_name": "all-MiniLM-L6-v2",  # Embedding model
+    "chunk_pause_seconds": 0.4  # Paragraph chunking pause (seconds)
 }
 
 
@@ -221,6 +224,30 @@ class NearTotalRecall(OVOSSkill):
 
         return description  # Default to full memory
 
+    def speak_buffered(self, dialog_file: str, text: str):
+        """Speak text in paragraph-sized chunks (delimited by blank lines)."""
+        if not text:
+            return
+
+        # Load pause from settings
+        pause = self.settings.get("chunk_pause_seconds", 0.4)
+
+        # Normalize line breaks
+        normalized = text.replace("\r\n", "\n").strip()
+        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", normalized) if p.strip()]
+
+        # First paragraph uses the main dialog
+        self.speak_dialog(dialog_file, {"memory": paragraphs[0]}, wait=True)
+
+        # Remaining paragraphs
+        for p in paragraphs[1:]:
+            if not self.is_reciting:
+                break
+            # self.wait_while_speaking()
+            time.sleep(pause)
+            # Use your optional chunk dialog, otherwise raw speak
+            self.speak_dialog("recite_chunk", {"memory": p}, wait=True)
+
     @intent_handler("DoYouRecall.intent")
     def handle_do_you_recall_intent(self, message):
         if not self.enabled:
@@ -241,7 +268,8 @@ class NearTotalRecall(OVOSSkill):
                 self.is_reciting = True
                 if self.media_available:
                     self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
-                self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+                # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+                self.speak_buffered(dialog_file, memory_content)
                 self.is_reciting = False
                 return True  # Fallback Friendly 3
 
@@ -263,7 +291,8 @@ class NearTotalRecall(OVOSSkill):
                 self.is_reciting = True
                 if self.media_available:  # <== ADDED check
                     self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
-                self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+                # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+                self.speak_buffered(dialog_file, memory_content)
                 self.is_reciting = False
                 return True  # Fallback Friendly
             else:
@@ -280,7 +309,7 @@ class NearTotalRecall(OVOSSkill):
                 self.speak_dialog("no_memory_found")
 
     @intent_handler("MemoryChecker.intent")
-    def handle_memory_checker_intent(self, message):
+    def handle_memory_checker_intent(self, _message):
         self.speak("Checking MeePi Memory Banks")
         total_memories = len(self.memory_data)
         era_counts = Counter(m.get("Era", "Unknown") or "Unknown" for m in self.memory_data)
@@ -303,7 +332,7 @@ class NearTotalRecall(OVOSSkill):
         return
 
     @intent_handler("RandomMemory.intent")
-    def handle_random_memory_intent(self, message):
+    def handle_random_memory_intent(self, _message):
         if not self.enabled:
             self.speak_dialog("ntr_disabled_due_to_error")
             return
@@ -321,7 +350,8 @@ class NearTotalRecall(OVOSSkill):
             self.is_reciting = True
             if self.media_available:  # <== ADDED check
                 self.display_cover_image(memory)  # <== FIXED: pass full dict
-            self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+            # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+            self.speak_buffered(dialog_file, memory_content)
             self.is_reciting = False
             return True  # Fallback Friendly
         else:
@@ -333,7 +363,7 @@ class NearTotalRecall(OVOSSkill):
         return
 
     @intent_handler("ThanksCatcher.intent")
-    def handle_gratitude_poltergeist(self, message):
+    def handle_gratitude_poltergeist(self, _message):
         self.log.info("🩹 Caught stray 'thank you' — likely OVOS bug.")
         # THIS IS A KLUDGE ... catch strays
         # MeePI Says NOTHING, Knows NOTHING, Does NOTHING
