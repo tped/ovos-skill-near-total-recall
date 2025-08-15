@@ -373,9 +373,8 @@ class NearTotalRecall(OVOSSkill):
         """ Action to take when "stop" is requested by the user.
         """
         if self.is_reciting:
-            self.speak("")  # Stop MeePi from talking
             self.is_reciting = False
-            self.speak_dialog("stopped_talking.dialog")  # Feedback
+            self.speak_dialog("stopped_talking")  # Feedback
             self.log.info("MeePi was interrupted by user.")
             return True  # Indicate that MeePi stopped
         return False  # Nothing was interrupted
