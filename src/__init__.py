@@ -2,6 +2,7 @@ from ovos_utils import classproperty
 from ovos_utils.process_utils import RuntimeRequirements
 from ovos_workshop.decorators import intent_handler
 from ovos_workshop.skills import OVOSSkill
+from ovos_bus_client.session import SessionManager
 
 import os
 import re
@@ -37,6 +38,7 @@ class NearTotalRecall(OVOSSkill):
         other base class settings are only available after the call to super().
         """
         super().__init__(*args, **kwargs)
+        self.session_results = {}
         self.learning = True
         self.is_reciting = False
 
@@ -373,9 +375,15 @@ class NearTotalRecall(OVOSSkill):
     def stop(self):
         """ Action to take when "stop" is requested by the user.
         """
+        session = SessionManager.get()
+        # called during global stop only
+
+        if session.session_id in self.session_results:
+            self.session_results.pop(session.session_id)
+        if session.session_id == "default":
+            self.gui.release()
+
         if self.is_reciting:
             self.is_reciting = False
             # self.speak_dialog("stopped_talking")  # Feedback
             self.log.info("MeePi was interrupted by user.")
-            return True  # Indicate that MeePi stopped
-        return False  # Nothing was interrupted
