@@ -108,7 +108,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - Last Fix in Stop Logic Attempt 2")
+        self.speak("MeePi is Alive - WITH Updated Stop Logic & show image for 20")
 
     @classproperty
     def runtime_requirements(self):
@@ -185,7 +185,7 @@ class NearTotalRecall(OVOSSkill):
         for ext in [".jpg", ".jpeg", ".png"]:
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
-                self.gui.show_image(cover_path, fill='PreserveAspectFit')
+                self.gui.show_image(cover_path, fill='PreserveAspectFit', override_idle=20)
                 self.log.info(f"✅ Found cover image ({cover_path}) — displaying it.")
                 return
 
@@ -212,7 +212,7 @@ class NearTotalRecall(OVOSSkill):
 
         # Project image of MeeSelf (if option set)
         if self.display_mee_image:
-            self.gui.show_image(self.image_path, fill='PreserveAspectFit')
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=20)
 
         # Extract details
         description = memory['Memory_Description']
