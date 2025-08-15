@@ -106,6 +106,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
+        self.speak("MeePi is Alive - Last Fix in Stop Logic")
 
     @classproperty
     def runtime_requirements(self):
