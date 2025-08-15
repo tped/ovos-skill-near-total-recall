@@ -106,7 +106,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - Last Fix in Stop Logic")
+        self.speak("MeePi is Alive - Last Fix in Stop Logic Attempt 2")
 
     @classproperty
     def runtime_requirements(self):
@@ -375,7 +375,7 @@ class NearTotalRecall(OVOSSkill):
         """
         if self.is_reciting:
             self.is_reciting = False
-            self.speak_dialog("stopped_talking")  # Feedback
+            # self.speak_dialog("stopped_talking")  # Feedback
             self.log.info("MeePi was interrupted by user.")
             return True  # Indicate that MeePi stopped
         return False  # Nothing was interrupted
