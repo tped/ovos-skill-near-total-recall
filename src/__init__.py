@@ -108,7 +108,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - WITH No wait full/summary and gui clear")
+        self.speak("MeePi is Alive - WITH updated display cover image")
 
     @classproperty
     def runtime_requirements(self):
@@ -168,7 +168,7 @@ class NearTotalRecall(OVOSSkill):
     def display_cover_image(self, memory):
         """If a cover image exists for the memory, show it on the GUI."""
         raw_timestamp = memory.get("Timestamp", "")
-        title = memory.get("Title", "").lower().replace(" ", "_")
+        raw_title = memory.get("Title", "")
 
         # Convert human-readable timestamp to sortable format
         try:
@@ -178,14 +178,20 @@ class NearTotalRecall(OVOSSkill):
             self.log.warning(f"Could not parse timestamp '{raw_timestamp}': {e}")
             sortable_ts = "unknown_time"
 
-        folder_name = f"{sortable_ts}_{title}"
+        # Match MeePi_MediaFoldersV6.py sanitation
+        safe_title = re.sub(r"[^a-zA-Z0-9_\-]", "_", raw_title).lower()
+        folder_name = f"{sortable_ts}_{safe_title}"
         folder_path = os.path.join(self.media_folder, folder_name)
 
         # Look for the first valid cover image
         for ext in [".jpg", ".jpeg", ".png"]:
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
-                self.gui.show_image(cover_path, fill='PreserveAspectFit', override_idle=30)
+                self.gui.show_image(
+                    cover_path,
+                    fill="PreserveAspectFit",
+                    override_idle=30
+                )
                 self.log.info(f"✅ Found cover image ({cover_path}) — displaying it.")
                 return
 
