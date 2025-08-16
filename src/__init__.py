@@ -185,7 +185,7 @@ class NearTotalRecall(OVOSSkill):
         for ext in [".jpg", ".jpeg", ".png"]:
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
-                self.gui.show_image(cover_path, fill='PreserveAspectFit', override_idle=20)
+                self.gui.show_image(cover_path, fill='PreserveAspectFit', override_idle=30)
                 self.log.info(f"✅ Found cover image ({cover_path}) — displaying it.")
                 return
 
@@ -212,7 +212,7 @@ class NearTotalRecall(OVOSSkill):
 
         # Project image of MeeSelf (if option set)
         if self.display_mee_image:
-            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=20)
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=30)
 
         # Extract details
         description = memory['Memory_Description']
@@ -224,7 +224,9 @@ class NearTotalRecall(OVOSSkill):
             response = self.get_response("long_story_warning")  # Ask user for choice
             if response and "summary" in response.lower() and has_summary:
                 return memory["Memory_Summary"]  # Return summary
-
+            if "full" in response.lower() or "fall" in response.lower() or "all" in response.lower():
+                return description  # Explicit full request
+        # Default if user gives no usable response
         return description  # Default to full memory
 
     def speak_buffered(self, dialog_file: str, text: str):
@@ -297,6 +299,8 @@ class NearTotalRecall(OVOSSkill):
                 # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.speak_buffered(dialog_file, memory_content)
                 self.is_reciting = False
+                # Release GUI only when done with intent
+                self.gui.release()
                 return True  # Fallback Friendly
             else:
                 self.log.info(f"RESULTS but NO CONTENT For query: {query}")
@@ -356,6 +360,8 @@ class NearTotalRecall(OVOSSkill):
             # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
             self.speak_buffered(dialog_file, memory_content)
             self.is_reciting = False
+            # Release GUI only when done with intent
+            self.gui.release()
             return True  # Fallback Friendly
         else:
             self.log.info(f"RESULTS but NO CONTENT For Random Memory")
