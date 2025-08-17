@@ -9,6 +9,7 @@ import re
 import json
 import random
 import time
+import math
 from datetime import datetime
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -27,7 +28,7 @@ DEFAULT_SETTINGS = {
     "top_n": 5,  # Number of top results to return
     "similarity_threshold": 0.32,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2",  # Embedding model
-    "chunk_pause_seconds": 0.4  # Paragraph chunking pause (seconds)
+    "chunk_pause_seconds": 0.3  # Paragraph chunking pause (seconds)
 }
 
 
@@ -70,6 +71,7 @@ class NearTotalRecall(OVOSSkill):
         self.top_n = self.settings.get("top_n")
         self.similarity_threshold = self.settings.get("similarity_threshold")
         self.model_name = self.settings.get("model_name")
+        self.chunk_pause = self.settings.get("chunk_pause_seconds")
 
         # Initialize with paths to the memory_bank and embeddings.
 
@@ -108,7 +110,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - WITH updated display cover image")
+        self.speak("MeePi is Alive - WITH updated Chunk Pause & display cover for TTS Time")
 
     @classproperty
     def runtime_requirements(self):
@@ -187,10 +189,13 @@ class NearTotalRecall(OVOSSkill):
         for ext in [".jpg", ".jpeg", ".png"]:
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
+                # Use memory's TTS time, fallback to 20 if missing
+                tts_time = memory.get("tts_time_seconds", 20)
+                hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
                 self.gui.show_image(
                     cover_path,
                     fill="PreserveAspectFit",
-                    override_idle=30
+                    override_idle=hold_time
                 )
                 self.log.info(f"✅ Found cover image ({cover_path}) — displaying it.")
                 return
@@ -216,9 +221,13 @@ class NearTotalRecall(OVOSSkill):
         # We CAN remember!
         memory = memory_row[0]
 
+        # Use memory's TTS time, fallback to 20 if missing
+        tts_time = memory.get("tts_time_seconds", 20)
+        hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
+
         # Project image of MeeSelf (if option set)
         if self.display_mee_image:
-            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=30)
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=hold_time)
 
         # Extract details
         description = memory['Memory_Description']
@@ -241,7 +250,7 @@ class NearTotalRecall(OVOSSkill):
             return
 
         # Load pause from settings
-        pause = self.settings.get("chunk_pause_seconds", 0.4)
+        pause = self.chunk_pause
 
         # Normalize line breaks
         normalized = text.replace("\r\n", "\n").strip()
