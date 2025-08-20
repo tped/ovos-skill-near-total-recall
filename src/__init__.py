@@ -3,6 +3,7 @@ from ovos_utils.process_utils import RuntimeRequirements
 from ovos_workshop.decorators import intent_handler
 from ovos_workshop.skills import OVOSSkill
 from ovos_bus_client.session import SessionManager
+from ovos_bus_client.message import Message
 
 import os
 import re
@@ -257,6 +258,7 @@ class NearTotalRecall(OVOSSkill):
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", normalized) if p.strip()]
 
         # First paragraph uses the main dialog
+        self.bus.emit(Message("recognizer_loop:audio_output_start"))
         self.speak_dialog(dialog_file, {"memory": paragraphs[0]}, wait=True)
 
         # Remaining paragraphs
@@ -267,6 +269,8 @@ class NearTotalRecall(OVOSSkill):
             time.sleep(pause)
             # Use your optional chunk dialog, otherwise raw speak
             self.speak_dialog("recite_chunk", {"memory": p}, wait=True)
+
+        self.bus.emit(Message("recognizer_loop:audio_output_end"))
 
     @intent_handler("DoYouRecall.intent")
     def handle_do_you_recall_intent(self, message):
@@ -408,3 +412,4 @@ class NearTotalRecall(OVOSSkill):
             self.is_reciting = False
             # self.speak_dialog("stopped_talking")  # Feedback
             self.log.info("MeePi was interrupted by user.")
+
