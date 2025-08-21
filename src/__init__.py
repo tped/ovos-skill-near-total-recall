@@ -111,7 +111,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - WITH updated Chunk Pause & display cover for TTS Time")
+        self.speak("MeePi is Alive - WITH updated Try/finally and poll")
 
     @classproperty
     def runtime_requirements(self):
@@ -245,32 +245,41 @@ class NearTotalRecall(OVOSSkill):
         # Default if user gives no usable response
         return description  # Default to full memory
 
+    def wait_for_spoken(self):
+        """Poll session until TTS finishes instead of using hard-coded 15s timeout."""
+        session = SessionManager.get()
+        while session.is_speaking and self.is_reciting:
+            time.sleep(0.2)
+
     def speak_buffered(self, dialog_file: str, text: str):
         """Speak text in paragraph-sized chunks (delimited by blank lines)."""
         if not text:
             return
 
-        # Load pause from settings
         pause = self.chunk_pause
 
         # Normalize line breaks
         normalized = text.replace("\r\n", "\n").strip()
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", normalized) if p.strip()]
 
-        # First paragraph uses the main dialog
+        self.is_reciting = True
         self.bus.emit(Message("recognizer_loop:audio_output_start"))
-        self.speak_dialog(dialog_file, {"memory": paragraphs[0]}, wait=True)
 
-        # Remaining paragraphs
-        for p in paragraphs[1:]:
-            if not self.is_reciting:
-                break
-            # self.wait_while_speaking()
-            time.sleep(pause)
-            # Use your optional chunk dialog, otherwise raw speak
-            self.speak_dialog("recite_chunk", {"memory": p}, wait=True)
+        try:
+            # First paragraph
+            self.speak_dialog(dialog_file, {"memory": paragraphs[0]}, wait=False)
+            self.wait_for_spoken()
 
-        self.bus.emit(Message("recognizer_loop:audio_output_end"))
+            # Remaining paragraphs
+            for p in paragraphs[1:]:
+                if not self.is_reciting:
+                    break
+                time.sleep(pause)
+                self.speak_dialog("recite_chunk", {"memory": p}, wait=False)
+                self.wait_for_spoken()
+        finally:
+            self.is_reciting = False
+            self.bus.emit(Message("recognizer_loop:audio_output_end"))
 
     @intent_handler("DoYouRecall.intent")
     def handle_do_you_recall_intent(self, message):
@@ -289,12 +298,10 @@ class NearTotalRecall(OVOSSkill):
             memory_content = self.recall_full_memory(exact_match[0]['Timestamp'])
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-                self.is_reciting = True
                 if self.media_available:
                     self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
                 # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.speak_buffered(dialog_file, memory_content)
-                self.is_reciting = False
                 return True  # Fallback Friendly 3
 
         # Fall-thru to find the closest match logic
@@ -312,12 +319,10 @@ class NearTotalRecall(OVOSSkill):
 
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-                self.is_reciting = True
                 if self.media_available:  # <== ADDED check
                     self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
                 # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.speak_buffered(dialog_file, memory_content)
-                self.is_reciting = False
                 # Release GUI only when done with intent
                 self.gui.release()
                 return True  # Fallback Friendly
@@ -373,12 +378,10 @@ class NearTotalRecall(OVOSSkill):
         if memory_content:
             self.speak_dialog("random_memory", {"era": memory_content})
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-            self.is_reciting = True
             if self.media_available:  # <== ADDED check
                 self.display_cover_image(memory)  # <== FIXED: pass full dict
             # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
             self.speak_buffered(dialog_file, memory_content)
-            self.is_reciting = False
             # Release GUI only when done with intent
             self.gui.release()
             return True  # Fallback Friendly
