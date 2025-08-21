@@ -3,7 +3,7 @@ from ovos_utils.process_utils import RuntimeRequirements
 from ovos_workshop.decorators import intent_handler
 from ovos_workshop.skills import OVOSSkill
 from ovos_bus_client.session import SessionManager
-from ovos_bus_client.message import Message
+# from ovos_bus_client.message import Message
 
 import os
 import re
@@ -111,7 +111,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - WITH updated Try/finally and poll")
+        self.speak("MeePi is Alive - WITH No Poll and wait=True in speak_buffered")
 
     @classproperty
     def runtime_requirements(self):
@@ -245,12 +245,6 @@ class NearTotalRecall(OVOSSkill):
         # Default if user gives no usable response
         return description  # Default to full memory
 
-    def wait_for_spoken(self):
-        """Poll session until TTS finishes instead of using hard-coded 15s timeout."""
-        session = SessionManager.get()
-        while session.is_speaking and self.is_reciting:
-            time.sleep(0.2)
-
     def speak_buffered(self, dialog_file: str, text: str):
         """Speak text in paragraph-sized chunks (delimited by blank lines)."""
         if not text:
@@ -263,23 +257,19 @@ class NearTotalRecall(OVOSSkill):
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", normalized) if p.strip()]
 
         self.is_reciting = True
-        self.bus.emit(Message("recognizer_loop:audio_output_start"))
 
         try:
             # First paragraph
-            self.speak_dialog(dialog_file, {"memory": paragraphs[0]}, wait=False)
-            self.wait_for_spoken()
+            self.speak_dialog(dialog_file, {"memory": paragraphs[0]}, wait=True)
 
             # Remaining paragraphs
             for p in paragraphs[1:]:
                 if not self.is_reciting:
                     break
                 time.sleep(pause)
-                self.speak_dialog("recite_chunk", {"memory": p}, wait=False)
-                self.wait_for_spoken()
+                self.speak_dialog("recite_chunk", {"memory": p}, wait=True)
         finally:
             self.is_reciting = False
-            self.bus.emit(Message("recognizer_loop:audio_output_end"))
 
     @intent_handler("DoYouRecall.intent")
     def handle_do_you_recall_intent(self, message):
