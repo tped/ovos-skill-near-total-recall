@@ -5,3 +5,5 @@ ovos-plugin-manager
 # Your requirements here
 numpy
 Sentence-Transformers
+scikit-learn
+transformers

@@ -18,10 +18,10 @@ from collections import Counter
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
-    "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings.npy",
-    "memories_data_path": "/home/ovos/NTR-Data/MeePiMemoryBank.json",
-    "mee_image_path": "/home/ovos/NTR-Data/cover.jpg",
-    "media_folder": "/home/ovos/MeePi_Media",
+    "embeddings_path": "/home/neon/NTR-Data/MeePiEmbeddings.npy",
+    "memories_data_path": "/home/neon/NTR-Data/MeePiMemoryBank.json",
+    "mee_image_path": "/home/neon/NTR-Data/cover.jpg",
+    "media_folder": "/home/neon/MeePi_Media",
     "display_mee_image":  True,
     "fallback_friendly": False,  # True to quietly pass unknowns on to AI Brain
 
@@ -111,7 +111,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - WITH No Poll and wait=True in speak_buffered")
+        self.speak("MeePi is Alive - All wet for Neon test w/ updated requirements")
 
     @classproperty
     def runtime_requirements(self):
