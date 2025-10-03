@@ -111,7 +111,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - Back from Neon test with updated requirements")
+        self.speak("MeePi is Alive - Random Memory should be fixed")
 
     @classproperty
     def runtime_requirements(self):
@@ -362,11 +362,14 @@ class NearTotalRecall(OVOSSkill):
         memory = random.choice(self.memory_data)
         memory_id = memory["Timestamp"]
 
+        # Grab the era directly from the memory dict
+        era_name = memory.get("Era", "past")
+
         # memory = results[0]  # Take the first match
         memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
 
         if memory_content:
-            self.speak_dialog("random_memory", {"era": memory_content})
+            self.speak_dialog("random_memory", {"era": era_name})
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             if self.media_available:  # <== ADDED check
                 self.display_cover_image(memory)  # <== FIXED: pass full dict
@@ -405,4 +408,3 @@ class NearTotalRecall(OVOSSkill):
             self.is_reciting = False
             # self.speak_dialog("stopped_talking")  # Feedback
             self.log.info("MeePi was interrupted by user.")
-
