@@ -111,7 +111,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi is Alive - Random Memory should be fixed")
+        self.speak("MeePi's Near Total Recall is Alive - with New init Announcement")
 
     @classproperty
     def runtime_requirements(self):
