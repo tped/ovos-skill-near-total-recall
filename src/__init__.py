@@ -21,7 +21,7 @@ DEFAULT_SETTINGS = {
     "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings.npy",
     "memories_data_path": "/home/ovos/NTR-Data/MeePiMemoryBank.json",
     "mee_image_path": "/home/ovos/NTR-Data/cover.jpg",
-    "media_folder": "/home/ovos/MeePi_Media",
+    "media_folder": "/home/ovos/MeePi_MemoryPalace",
     "display_mee_image":  True,
     "fallback_friendly": False,  # True to quietly pass unknowns on to AI Brain
 
@@ -111,7 +111,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 2.  Stable")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 3.  Using Memory Palace")
 
     @classproperty
     def runtime_requirements(self):
