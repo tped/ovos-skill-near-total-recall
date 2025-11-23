@@ -111,7 +111,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 3.  Using Memory Palace")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 4.  Improved speak_buffered")
 
     @classproperty
     def runtime_requirements(self):
@@ -251,23 +251,42 @@ class NearTotalRecall(OVOSSkill):
             return
 
         pause = self.chunk_pause
+        self.is_reciting = True
 
         # Normalize line breaks
         normalized = text.replace("\r\n", "\n").strip()
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", normalized) if p.strip()]
 
-        self.is_reciting = True
-
         try:
-            # First paragraph
-            self.speak_dialog(dialog_file, {"memory": paragraphs[0]}, wait=True)
-
-            # Remaining paragraphs
-            for p in paragraphs[1:]:
+            for i, p in enumerate(paragraphs):
                 if not self.is_reciting:
                     break
-                time.sleep(pause)
-                self.speak_dialog("recite_chunk", {"memory": p}, wait=True)
+
+                # --- NEW LOGIC STARTS HERE ---
+                # 1. If it is the first paragraph, split out the first sentence
+                if i == 0 and len(p) > 60:
+                    # Find the first sentence ending (.?!)
+                    match = re.search(r'(?<=[.?!])\s+', p)
+                    if match:
+                        first_sentence = p[:match.start()]
+                        rest_of_paragraph = p[match.end():]
+
+                        # Speak first sentence immediately (Fast start)
+                        self.speak_dialog("recite_chunk", {"memory": first_sentence}, wait=True)
+
+                        # Queue the rest
+                        if rest_of_paragraph:
+                            self.speak_dialog("recite_chunk", {"memory": rest_of_paragraph}, wait=True)
+                        continue  # Skip standard processing for this paragraph
+                # --- NEW LOGIC ENDS HERE ---
+
+                if i > 0:
+                    time.sleep(pause)
+
+                # Use the specific dialog for the first chunk, generic for the rest
+                dialog_to_use = dialog_file if i == 0 else "recite_chunk"
+                self.speak_dialog(dialog_to_use, {"memory": p}, wait=True)
+
         finally:
             self.is_reciting = False
 
