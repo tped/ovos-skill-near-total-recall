@@ -29,7 +29,8 @@ DEFAULT_SETTINGS = {
     "top_n": 5,  # Number of top results to return
     "similarity_threshold": 0.32,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2",  # Embedding model
-    "chunk_pause_seconds": 0.3  # Paragraph chunking pause (seconds)
+    "chunk_pause_seconds": 0.3,  # Paragraph chunking pause (seconds)
+    "max_tts_chunk_size": 250   # Max Characters per TTS call
 }
 
 
@@ -73,6 +74,7 @@ class NearTotalRecall(OVOSSkill):
         self.similarity_threshold = self.settings.get("similarity_threshold")
         self.model_name = self.settings.get("model_name")
         self.chunk_pause = self.settings.get("chunk_pause_seconds")
+        self.max_chunk_size = self.settings.get("max_tts_chunk_size", 250)
 
         # Initialize with paths to the memory_bank and embeddings.
 
@@ -111,7 +113,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 4.  Improved speak_buffered")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 5.  Now with Smart Chunking!")
 
     @classproperty
     def runtime_requirements(self):
@@ -245,15 +247,42 @@ class NearTotalRecall(OVOSSkill):
         # Default if user gives no usable response
         return description  # Default to full memory
 
+    @staticmethod
+    def _smart_chunk(text, limit):
+        """
+        Splits text into chunks of roughly 'limit' characters,
+        but avoids breaking sentences in the middle.
+        """
+        # Split by sentence endings (. ? ! followed by whitespace)
+        sentences = re.split(r'(?<=[.?!])\s+', text)
+
+        chunks = []
+        current_chunk = ""
+
+        for s in sentences:
+            # If adding this sentence stays under the limit, add it
+            if len(current_chunk) + len(s) < limit:
+                current_chunk += s + " "
+            else:
+                # Limit reached: push current chunk and start a new one
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = s + " "
+
+        # Don't forget the leftovers
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+
+        return chunks
+
     def speak_buffered(self, dialog_file: str, text: str):
-        """Speak text in paragraph-sized chunks (delimited by blank lines)."""
         if not text:
             return
 
         pause = self.chunk_pause
         self.is_reciting = True
 
-        # Normalize line breaks
+        # Normalize line breaks to handle paragraphs
         normalized = text.replace("\r\n", "\n").strip()
         paragraphs = [p.strip() for p in re.split(r"\n\s*\n", normalized) if p.strip()]
 
@@ -262,30 +291,37 @@ class NearTotalRecall(OVOSSkill):
                 if not self.is_reciting:
                     break
 
-                # --- NEW LOGIC STARTS HERE ---
-                # 1. If it is the first paragraph, split out the first sentence
+                # --- LOGIC START ---
+                text_to_chunk = p
+
+                # 1. OPTIMIZATION: If it's the very first paragraph,
+                # peel off the first sentence for immediate playback.
                 if i == 0 and len(p) > 60:
-                    # Find the first sentence ending (.?!)
                     match = re.search(r'(?<=[.?!])\s+', p)
                     if match:
                         first_sentence = p[:match.start()]
-                        rest_of_paragraph = p[match.end():]
+                        text_to_chunk = p[match.end():]  # The rest gets chunked below
 
-                        # Speak first sentence immediately (Fast start)
+                        # SPEAK FIRST SENTENCE IMMEDIATELY
                         self.speak_dialog("recite_chunk", {"memory": first_sentence}, wait=True)
 
-                        # Queue the rest
-                        if rest_of_paragraph:
-                            self.speak_dialog("recite_chunk", {"memory": rest_of_paragraph}, wait=True)
-                        continue  # Skip standard processing for this paragraph
-                # --- NEW LOGIC ENDS HERE ---
+                # 2. Smart Chunk the remaining text
+                # This prevents the "Loading..." gap between sentence 1 and 2
+                chunks = self._smart_chunk(text_to_chunk, self.max_chunk_size)
 
-                if i > 0:
+                for j, chunk in enumerate(chunks):
+                    if not self.is_reciting:
+                        break
+
+                    # Use generic 'recite_chunk' unless it's the very first block of the entire memory
+                    # (This handles your original dialog_file logic)
+                    dialog = dialog_file if (i == 0 and j == 0 and text_to_chunk == p) else "recite_chunk"
+
+                    self.speak_dialog(dialog, {"memory": chunk}, wait=True)
+
+                # Paragraph Pause (only if there is more coming)
+                if i < len(paragraphs) - 1:
                     time.sleep(pause)
-
-                # Use the specific dialog for the first chunk, generic for the rest
-                dialog_to_use = dialog_file if i == 0 else "recite_chunk"
-                self.speak_dialog(dialog_to_use, {"memory": p}, wait=True)
 
         finally:
             self.is_reciting = False
