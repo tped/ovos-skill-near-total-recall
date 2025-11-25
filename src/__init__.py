@@ -30,7 +30,7 @@ DEFAULT_SETTINGS = {
     "similarity_threshold": 0.32,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2",  # Embedding model
     "chunk_pause_seconds": 0.3,  # Paragraph chunking pause (seconds)
-    "max_tts_chunk_size": 250   # Max Characters per TTS call
+    "max_tts_chunk_size": 600   # Max Characters per TTS call
 }
 
 
@@ -113,7 +113,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 5.  Now with Smart Chunking!")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 6.  Announce STOP and Increased Chunk_size")
 
     @classproperty
     def runtime_requirements(self):
@@ -461,5 +461,5 @@ class NearTotalRecall(OVOSSkill):
 
         if self.is_reciting:
             self.is_reciting = False
-            # self.speak_dialog("stopped_talking")  # Feedback
+            self.speak_dialog("stopped_talking")  # Feedback
             self.log.info("MeePi was interrupted by user.")
