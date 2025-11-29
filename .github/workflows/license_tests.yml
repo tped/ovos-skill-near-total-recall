@@ -12,5 +12,5 @@ jobs:
   license_tests:
     name: license_tests
     permissions:
-      contents: read
+    contents: read
     uses: neongeckocom/.github/.github/workflows/license_tests.yml@master

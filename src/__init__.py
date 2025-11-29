@@ -1,3 +1,8 @@
+# Copyright 2044 TPed
+#
+# Licensed under the MIT License.
+# You may obtain a copy of the License at https://opensource.org/licenses/MIT
+
 from ovos_utils import classproperty
 from ovos_utils.process_utils import RuntimeRequirements
 from ovos_workshop.decorators import intent_handler
@@ -113,7 +118,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 6.  Announce STOP and Increased Chunk_size")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 7.  Tune-up Step 1: announce memory found")
 
     @classproperty
     def runtime_requirements(self):
@@ -207,7 +212,7 @@ class NearTotalRecall(OVOSSkill):
 
     def recall_full_memory(self, memory_id):
         """
-        This method retrieves the full memory details (e.g., from MeePiMemories.csv) using the memory ID.
+        This method retrieves the full memory details (e.g., from MeePiMemoryBanks) using the memory ID.
         We'll also see if it is long-winded and offer a summary
         """
         if self.memory_data is None:
@@ -359,6 +364,21 @@ class NearTotalRecall(OVOSSkill):
             similarity, memory_dict, memory_id, memory_title = results[0]  # <== CLARIFIED/FIXED
             self.log.info(f"🧠 Best match: '{memory_title}' (Score: {similarity:.4f})")
 
+            # --- Tune-up Step 1: announce memory found (non-blocking) ---
+            era_name = memory_dict.get("Era", "the past") or "the past"
+            mem_type = memory_dict.get("Memory_Type", "personal") or "personal"
+
+            # speak preamble from memory_found.dialog
+            self.speak_dialog(
+                "memory_found",
+                {"era_name": era_name, "mem_type": mem_type},
+                wait=False
+            )
+
+            # speak memory title immediately after
+            title = memory_dict.get("Title", "this one")
+            self.speak(f"It's titled: {title}", wait=False)
+
             # memory = results[0]  # Take the first match
             memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
 
@@ -366,7 +386,6 @@ class NearTotalRecall(OVOSSkill):
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 if self.media_available:  # <== ADDED check
                     self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
-                # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.speak_buffered(dialog_file, memory_content)
                 # Release GUI only when done with intent
                 self.gui.release()
