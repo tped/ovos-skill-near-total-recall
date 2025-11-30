@@ -118,7 +118,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 7.  Tune-up Step 1: announce memory found")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 8.  Tune-up Step 2: Summary by default")
 
     @classproperty
     def runtime_requirements(self):
@@ -245,10 +245,12 @@ class NearTotalRecall(OVOSSkill):
         # Warn the user and offer summary if available
         if is_long:
             response = self.get_response("long_story_warning")  # Ask user for choice
-            if response and "summary" in response.lower() and has_summary:
-                return memory["Memory_Summary"]  # Return summary
             if "full" in response.lower() or "fall" in response.lower() or "all" in response.lower():
                 return description  # Explicit full request
+            elif response and "summary" in response.lower() and has_summary:
+                return memory["Memory_Summary"]  # Return summary
+            elif has_summary:
+                return memory["Memory_Summary"]  # Return summary
         # Default if user gives no usable response
         return description  # Default to full memory
 
