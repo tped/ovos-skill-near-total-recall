@@ -1,8 +1,3 @@
-# Copyright 2024 TPed
-#
-# Licensed under the MIT License.
-# You may obtain a copy of the License at https://opensource.org/licenses/MIT
-
 from ovos_utils import classproperty
 from ovos_utils.process_utils import RuntimeRequirements
 from ovos_workshop.decorators import intent_handler
@@ -118,7 +113,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9.  Hand-off to Visual Recall")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 2.  Hand-off to Visual Recall. Take 2")
 
     @classproperty
     def runtime_requirements(self):
@@ -320,7 +315,7 @@ class NearTotalRecall(OVOSSkill):
 
         # Determine the quantifier for the user dialog
         if media_count == 1:
-            quantifier_text = "one related image"
+            quantifier_text = "a single related image"
         elif media_count <= 4:
             quantifier_text = "a few images"
         else:
