@@ -1,4 +1,4 @@
-# Copyright 2044 TPed
+# Copyright 2024 TPed
 #
 # Licensed under the MIT License.
 # You may obtain a copy of the License at https://opensource.org/licenses/MIT
@@ -8,7 +8,7 @@ from ovos_utils.process_utils import RuntimeRequirements
 from ovos_workshop.decorators import intent_handler
 from ovos_workshop.skills import OVOSSkill
 from ovos_bus_client.session import SessionManager
-# from ovos_bus_client.message import Message
+from ovos_bus_client.message import Message
 
 import os
 import re
@@ -118,7 +118,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 8.  Tune-up Step 2: Summary by default")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9.  Hand-off to Visual Recall")
 
     @classproperty
     def runtime_requirements(self):
@@ -251,8 +251,109 @@ class NearTotalRecall(OVOSSkill):
                 return memory["Memory_Summary"]  # Return summary
             elif has_summary:
                 return memory["Memory_Summary"]  # Return summary
-        # Default if user gives no usable response
+        # Default if user gives no usable response - should be short
         return description  # Default to full memory
+
+    def send_visual_recall_request(self, memory_dict):
+        """
+        Calculates folder path, counts all media types, asks user for confirmation,
+        and sends Messagebus request to Visual Recall skill if confirmed.
+        """
+        if not self.media_available:
+            self.log.info("Visual recall skipped: Media folder not available.")
+            self.gui.release()  # GUI Release
+            return
+
+        raw_timestamp = memory_dict.get("Timestamp", "")
+        raw_title = memory_dict.get("Title", "")
+
+        # Reconstruct the exact folder path (same logic as before)
+        try:
+            dt_obj = datetime.strptime(raw_timestamp, "%m/%d/%Y %H:%M:%S")
+            sortable_ts = dt_obj.strftime("%Y%m%d%H%M%S")
+        except ValueError:
+            self.log.warning(f"Could not parse timestamp '{raw_timestamp}'.")
+            sortable_ts = "unknown_time"
+        except TypeError:
+            self.log.warning(f"Timestamp was unexpected type.")
+            sortable_ts = "unknown_time"
+
+        # Match MeePi_MediaFoldersV6.py sanitation
+        safe_title = re.sub(r"[^a-zA-Z0-9_\-]", "_", raw_title).lower()
+        folder_name = f"{sortable_ts}_{safe_title}"
+        folder_path = os.path.join(self.media_folder, folder_name)
+
+        if not os.path.isdir(folder_path):
+            self.log.warning(f"Visual recall skipped: Folder not found at {folder_path}")
+            self.speak_dialog("end_of_memory")
+            self.gui.release()  # <-- CORRECTED: GUI Release
+            return
+
+        # --- 1. COUNT AND QUANTIFY ALL MEDIA ---
+
+        # Supported media extensions across all types (image, audio, video)
+        supported_ext = (
+            '.jpg', '.jpeg', '.png', '.gif',  # Images
+            '.mp4', '.mkv', '.avi', '.mov', '.webm',  # Videos
+            '.mp3', '.wav', '.flac', '.m4a', '.aac'  # Audio
+        )
+
+        all_media_files = [f for f in os.listdir(folder_path) if f.lower().endswith(supported_ext)]
+
+        # Filter out the cover image (it's handled separately by NTR/VR initial display)
+        files_to_display = [
+            f for f in all_media_files
+            if os.path.splitext(os.path.basename(f).lower())[0] != "cover"
+        ]
+
+        media_count = len(files_to_display)
+
+        # --- 2. BRANCHING LOGIC ---
+
+        if media_count == 0:
+            # Scenario: Only a cover image or no media to display
+            self.log.info("Visual recall: Only cover image or no media found.")
+            # Dialog: "That's all I remember."
+            self.speak_dialog("end_of_memory")
+            self.gui.release()  # GUI Release
+            return
+
+        # Determine the quantifier for the user dialog
+        if media_count == 1:
+            quantifier_text = "one related image"
+        elif media_count <= 4:
+            quantifier_text = "a few images"
+        else:
+            quantifier_text = "a lot of images"
+
+        # --- 3. ASK FOR USER CONFIRMATION ---
+        self.log.info("Asking user for visual confirmation with quantifier variable.")
+
+        # Pass the quantifier text to the visual_media_prompt.dialog file
+        response = self.get_response(
+            "visual_media_prompt",
+            data={"quantifier": quantifier_text},
+            num_retries=1
+        )
+
+        # --- 4. SEND SIGNAL OR FINISH ---
+
+        if response and self.voc_match(response, "yes"):
+            self.log.info(f"User confirmed: Sending visual recall request for {media_count} items.")
+            self.bus.emit(
+                Message(
+                    "visual.recall.display",  # The event registered in the VR skill
+                    data={
+                        "media_path": folder_path,
+                        "title": raw_title
+                    }
+                )
+            )
+        else:
+            self.log.info("User declined visual recall.")
+            self.speak_dialog("visual_declined")
+            self.gui.release()
+            return
 
     @staticmethod
     def _smart_chunk(text, limit):
@@ -349,11 +450,16 @@ class NearTotalRecall(OVOSSkill):
             memory_dict = exact_match[0]  # <== ADDED: give it a name for clarity
             memory_content = self.recall_full_memory(exact_match[0]['Timestamp'])
             if memory_content:
+                # speak memory title immediately after
+                title = memory_dict.get("Title", "this one")
+                self.speak(f"I clearly remember {title}!", wait=False)
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 if self.media_available:
                     self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
                 # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.speak_buffered(dialog_file, memory_content)
+                # NEW: Hand off to Visual Recall (handles GUI release internally)
+                self.send_visual_recall_request(memory_dict)
                 return True  # Fallback Friendly 3
 
         # Fall-thru to find the closest match logic
@@ -390,7 +496,9 @@ class NearTotalRecall(OVOSSkill):
                     self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
                 self.speak_buffered(dialog_file, memory_content)
                 # Release GUI only when done with intent
-                self.gui.release()
+                # NEW: Hand off to Visual Recall (handles GUI release internally)
+                self.send_visual_recall_request(memory_dict)
+                # self.gui.release() - send_visual_recall will do this
                 return True  # Fallback Friendly
             else:
                 self.log.info(f"RESULTS but NO CONTENT For query: {query}")
@@ -451,8 +559,9 @@ class NearTotalRecall(OVOSSkill):
                 self.display_cover_image(memory)  # <== FIXED: pass full dict
             # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
             self.speak_buffered(dialog_file, memory_content)
-            # Release GUI only when done with intent
-            self.gui.release()
+            # NEW: Hand off to Visual Recall
+            self.send_visual_recall_request(memory)
+            # self.gui.release() - send_visual will take care of this
             return True  # Fallback Friendly
         else:
             self.log.info(f"RESULTS but NO CONTENT For Random Memory")
