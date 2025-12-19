@@ -113,7 +113,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 2.  Hand-off to Visual Recall, Take 2")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 3.  Clean up speak Buffered")
 
     @classproperty
     def runtime_requirements(self):
@@ -382,7 +382,7 @@ class NearTotalRecall(OVOSSkill):
         if not text:
             return
 
-        pause = self.chunk_pause
+        # pause = self.chunk_pause
         self.is_reciting = True
 
         # Normalize line breaks to handle paragraphs
@@ -406,7 +406,7 @@ class NearTotalRecall(OVOSSkill):
                         text_to_chunk = p[match.end():]  # The rest gets chunked below
 
                         # SPEAK FIRST SENTENCE IMMEDIATELY
-                        self.speak_dialog("recite_chunk", {"memory": first_sentence}, wait=True)
+                        self.speak_dialog(dialog_file, {"memory": first_sentence}, wait=True)
 
                 # 2. Smart Chunk the remaining text
                 # This prevents the "Loading..." gap between sentence 1 and 2
@@ -416,15 +416,19 @@ class NearTotalRecall(OVOSSkill):
                     if not self.is_reciting:
                         break
 
-                    # Use generic 'recite_chunk' unless it's the very first block of the entire memory
-                    # (This handles your original dialog_file logic)
-                    dialog = dialog_file if (i == 0 and j == 0 and text_to_chunk == p) else "recite_chunk"
+                    # Determine if we should wait.
+                    # We only wait on the VERY LAST chunk of a paragraph
+                    # to respect your 'chunk_pause' (paragraph break).
+                    # is_last_chunk = (i == len(paragraphs) - 1) and (j == len(chunks) - 1)
+                    is_end_of_paragraph = (j == len(chunks) - 1)
 
-                    self.speak_dialog(dialog, {"memory": chunk}, wait=True)
+                    # Speak the chunk.
+                    # By setting wait=False for intermediate chunks, OVOS queues them.
+                    self.speak_dialog("recite_chunk", {"memory": chunk}, wait=is_end_of_paragraph)
 
-                # Paragraph Pause (only if there is more coming)
+                # Paragraph Pause - only if not the last paragraph
                 if i < len(paragraphs) - 1:
-                    time.sleep(pause)
+                    time.sleep(self.chunk_pause)
 
         finally:
             self.is_reciting = False
@@ -478,9 +482,10 @@ class NearTotalRecall(OVOSSkill):
                 wait=False
             )
 
+            # ### Temp Remove Title speak - we need to watch for third person
             # speak memory title immediately after
-            title = memory_dict.get("Title", "this one")
-            self.speak(f"It's titled: {title}", wait=False)
+            # title = memory_dict.get("Title", "this one")
+            # self.speak(f"It's titled: {title}", wait=False)
 
             # memory = results[0]  # Take the first match
             memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
@@ -586,5 +591,6 @@ class NearTotalRecall(OVOSSkill):
 
         if self.is_reciting:
             self.is_reciting = False
+            self.bus.emit(Message("mycroft.audio.speech.stop"))
             self.speak_dialog("stopped_talking")  # Feedback
             self.log.info("MeePi was interrupted by user.")
