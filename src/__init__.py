@@ -113,7 +113,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 3.  Clean up speak Buffered")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 4.  More Clean up speak Buffered")
 
     @classproperty
     def runtime_requirements(self):
@@ -406,7 +406,7 @@ class NearTotalRecall(OVOSSkill):
                         text_to_chunk = p[match.end():]  # The rest gets chunked below
 
                         # SPEAK FIRST SENTENCE IMMEDIATELY
-                        self.speak_dialog(dialog_file, {"memory": first_sentence}, wait=True)
+                        self.speak_dialog(dialog_file, {"memory": first_sentence}, wait=False)
 
                 # 2. Smart Chunk the remaining text
                 # This prevents the "Loading..." gap between sentence 1 and 2
