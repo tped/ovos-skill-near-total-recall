@@ -29,8 +29,8 @@ DEFAULT_SETTINGS = {
     "top_n": 5,  # Number of top results to return
     "similarity_threshold": 0.32,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2",  # Embedding model
-    "chunk_pause_seconds": 0.3,  # Paragraph chunking pause (seconds)
-    "max_tts_chunk_size": 600   # Max Characters per TTS call
+    "chunk_pause_seconds": 0.2,  # Paragraph chunking pause (seconds)
+    "max_tts_chunk_size": 300   # Max Characters per TTS call
 }
 
 
@@ -113,7 +113,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 4.  More Clean up speak Buffered")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 5.  Converse and setting tweaks")
 
     @classproperty
     def runtime_requirements(self):
@@ -136,6 +136,30 @@ class NearTotalRecall(OVOSSkill):
         This will reflect live changes to settings.json files (local or from backend)
         """
         return self.settings.get("my_setting", "default_value")
+
+    def converse(self, message=None):
+        # 1. Get the text
+        utterances = message.data.get('utterances', [])
+        if not utterances:
+            return False
+        utt = utterances[0].lower().strip()
+
+        # 2. THE STOP ESCAPE (Always let the user kill the process)
+        if self.voc_match(utt, "stop") or "stop" in utt:
+            self.log.info("NTR Shield: Stop requested. Killing recital.")
+            self.stop()  # This calls your skill's stop() method
+            return False  # Return False so the system-wide 'Stop' also fires
+
+        # 3. THE RECITING SHIELD
+        # If we are in the middle of a memory, we 'swallow' everything else.
+        if self.is_reciting:
+            # If it's empty, or "thanks", or random noise...
+            # We return True to tell OVOS 'I handled this (by ignoring it)'
+            self.log.info(f"NTR Shield: Swallowing noise/filler: '{utt}'")
+            return True
+
+            # 4. If we aren't reciting, let the brain work normally
+        return False
 
     def find_closest_memory(self, query):
         """
