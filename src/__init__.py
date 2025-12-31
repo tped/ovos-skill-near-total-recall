@@ -113,7 +113,7 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 5.  Converse and setting tweaks")
+        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 6.  No Title in Preamble")
 
     @classproperty
     def runtime_requirements(self):
@@ -475,7 +475,8 @@ class NearTotalRecall(OVOSSkill):
             if memory_content:
                 # speak memory title immediately after
                 title = memory_dict.get("Title", "this one")
-                self.speak(f"I clearly remember {title}!", wait=False)
+                # Temp Remove Title from preamble
+                # self.speak(f"I clearly remember {title}!", wait=False)
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 if self.media_available:
                     self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
