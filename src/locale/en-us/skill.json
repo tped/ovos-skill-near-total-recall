@@ -1,0 +1,12 @@
+{
+"skill_id": "ovos-skill-near-total-recall.tped",
+"source": "https://github.com/tped/ovos-skill-near-total-recall",
+"name": "Near Total Recall",
+"description": "This Skill retrieves and recalls most relevant topics (memories) from a dataset using natural language queries.",
+"examples": [
+"Tell me about {query}",
+"What do you remember about {query}",
+"Do you remember {query}"
+],
+"tags": [ "Memory-o-matic" ]
+}

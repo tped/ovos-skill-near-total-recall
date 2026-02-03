@@ -16,6 +16,13 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from collections import Counter
 
+from .version import (
+    VERSION_MAJOR,
+    VERSION_MINOR,
+    VERSION_BUILD,
+    VERSION_ALPHA
+)
+
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
     "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings.npy",
@@ -46,12 +53,21 @@ class NearTotalRecall(OVOSSkill):
         self.is_reciting = False
 
     def initialize(self):
-
         # merge default settings
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
         self.settings.merge(DEFAULT_SETTINGS, new_only=True)
+        self.log_level = self.settings.get("log_level", "INFO")
 
         self.load_databanks()
+
+        # Speak version if log_level != INFO
+        if self.log_level.upper() != "INFO":
+            ver = self.skill_version()
+            spoken_version = ver.replace("a", " alpha ")
+            self.speak(
+                f"Poetry skill, version {spoken_version}, initialized",
+                wait=False
+            )
 
         self.log.info(f"Done with Initialize")
 
@@ -128,6 +144,13 @@ class NearTotalRecall(OVOSSkill):
             no_network_fallback=True,
             no_gui_fallback=True,
         )
+
+    @staticmethod
+    def skill_version():
+        version_string = f"{VERSION_MAJOR}.{VERSION_MINOR}.{VERSION_BUILD}"
+        if VERSION_ALPHA and int(VERSION_ALPHA) > 0:
+            version_string += f"a{VERSION_ALPHA}"
+        return version_string
 
     @property
     def my_setting(self):
@@ -474,7 +497,7 @@ class NearTotalRecall(OVOSSkill):
             memory_content = self.recall_full_memory(exact_match[0]['Timestamp'])
             if memory_content:
                 # speak memory title immediately after
-                title = memory_dict.get("Title", "this one")
+                # title = memory_dict.get("Title", "this one")
                 # Temp Remove Title from preamble
                 # self.speak(f"I clearly remember {title}!", wait=False)
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
