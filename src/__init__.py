@@ -11,6 +11,7 @@ import json
 import random
 import time
 import math
+import filecmp
 from datetime import datetime
 import numpy as np
 from sentence_transformers import SentenceTransformer
@@ -129,7 +130,6 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("error_initialization")
 
         self.log.info(f"MeePi Databank Initialization Complete")
-        self.speak("MeePi Near Total Recall is Alive.  Version 0 dot 9 dot 6.  No Title in Preamble")
 
     @classproperty
     def runtime_requirements(self):
@@ -342,11 +342,29 @@ class NearTotalRecall(OVOSSkill):
 
         all_media_files = [f for f in os.listdir(folder_path) if f.lower().endswith(supported_ext)]
 
-        # Filter out the cover image (it's handled separately by NTR/VR initial display)
-        files_to_display = [
-            f for f in all_media_files
-            if os.path.splitext(os.path.basename(f).lower())[0] != "cover"
-        ]
+        # Identify the cover image path for comparison
+        cover_path = None
+        for f in all_media_files:
+            if os.path.splitext(f)[0].lower().strip() == "cover":
+                cover_path = os.path.join(folder_path, f)
+                break
+
+        # Build the display list by filtering out the cover and its exact clones
+        files_to_display = []
+        for f in all_media_files:
+            file_path = os.path.join(folder_path, f)
+            file_root = os.path.splitext(f)[0].lower().strip()
+
+            # Skip the actual file named 'cover'
+            if file_root == "cover":
+                continue
+
+            # Skip any file that is a duplicate of the cover (The Plymouth Fix)
+            if cover_path and filecmp.cmp(file_path, cover_path, shallow=True):
+                self.log.info(f"NTR: Ignoring {f} - it is a duplicate of the cover image.")
+                continue
+
+            files_to_display.append(f)
 
         media_count = len(files_to_display)
 
@@ -496,9 +514,11 @@ class NearTotalRecall(OVOSSkill):
             memory_dict = exact_match[0]  # <== ADDED: give it a name for clarity
             memory_content = self.recall_full_memory(exact_match[0]['Timestamp'])
             if memory_content:
+                #
+                # Temporary Remove Title from preamble - titles may be third person
+                #
                 # speak memory title immediately after
                 # title = memory_dict.get("Title", "this one")
-                # Temp Remove Title from preamble
                 # self.speak(f"I clearly remember {title}!", wait=False)
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 if self.media_available:
