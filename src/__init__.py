@@ -66,7 +66,7 @@ class NearTotalRecall(OVOSSkill):
             ver = self.skill_version()
             spoken_version = ver.replace("a", " alpha ")
             self.speak(
-                f"Poetry skill, version {spoken_version}, initialized",
+                f"MeePi Near Total Recall, version {spoken_version}, initialized",
                 wait=False
             )
 
