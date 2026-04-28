@@ -460,7 +460,7 @@ class NearTotalRecall(OVOSSkill):
                     break
 
                 # HEARTBEAT: Keep skill active so Shield stays up
-                self.make_active()
+                self.activate()
 
                 # --- LOGIC START ---
                 text_to_chunk = p
