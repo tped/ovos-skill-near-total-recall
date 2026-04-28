@@ -245,7 +245,7 @@ class NearTotalRecall(OVOSSkill):
                 self.gui.show_image(
                     cover_path,
                     fill="PreserveAspectFit",
-                    override_idle=hold_time
+                    override_idle=True
                 )
                 self.log.info(f"✅ Found cover image ({cover_path}) — displaying it.")
                 return
@@ -459,6 +459,9 @@ class NearTotalRecall(OVOSSkill):
                 if not self.is_reciting:
                     break
 
+                # HEARTBEAT: Keep skill active so Shield stays up
+                self.make_active()
+
                 # --- LOGIC START ---
                 text_to_chunk = p
 
@@ -613,6 +616,9 @@ class NearTotalRecall(OVOSSkill):
         # Pick a random memory
         memory = random.choice(self.memory_data)
         memory_id = memory["Timestamp"]
+
+        # PUNCH LIST: Log the title
+        self.log.info(f"🎲 Random Memory Selected: {memory.get('Title', 'Untitled')}")
 
         # Grab the era directly from the memory dict
         era_name = memory.get("Era", "past")
