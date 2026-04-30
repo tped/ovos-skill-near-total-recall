@@ -160,6 +160,28 @@ class NearTotalRecall(OVOSSkill):
         """
         return self.settings.get("my_setting", "default_value")
 
+    @staticmethod
+    def _flip_pronouns(text):
+        """Flip third-person or user-centric pronouns to first-person for MeePi."""
+        if not text:
+            return ""
+        # Pronoun mapping for the persona flip
+        swaps = {
+            r"\byour\b": "my",  # User says "your wedding" -> MeePi says "my wedding"
+            r"\bhis\b": "my",  # Title says "his wedding" -> MeePi says "my wedding"
+            r"\bher\b": "my",  # Title says "her wedding" -> MeePi says "my wedding"
+            r"\bhe\b": "I",  # Title says "he went" -> MeePi says "I went"
+            r"\bshe\b": "I",
+            r"\bhim\b": "me"
+        }
+
+        result = text
+        for pattern, replacement in swaps.items():
+            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+
+        # Cleanup whitespace
+        return re.sub(r'\s+', ' ', result).strip()
+
     def converse(self, message=None):
         # 1. Get the text
         utterances = message.data.get('utterances', [])
@@ -240,8 +262,8 @@ class NearTotalRecall(OVOSSkill):
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
                 # Use memory's TTS time, fallback to 20 if missing
-                tts_time = memory.get("tts_time_seconds", 20)
-                hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
+                # tts_time = memory.get("tts_time_seconds", 20)
+                # hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
                 self.gui.show_image(
                     cover_path,
                     fill="PreserveAspectFit",
@@ -628,6 +650,11 @@ class NearTotalRecall(OVOSSkill):
 
         if memory_content:
             self.speak_dialog("random_memory", {"era": era_name})
+            # Inside handle_random_memory_intent
+            raw_title = memory.get("Title", "")
+            spoken_title = self._flip_pronouns(raw_title)
+            if spoken_title:
+                self.speak(f"Oh, I remember {spoken_title}!", wait=False)
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             if self.media_available:  # <== ADDED check
                 self.display_cover_image(memory)  # <== FIXED: pass full dict

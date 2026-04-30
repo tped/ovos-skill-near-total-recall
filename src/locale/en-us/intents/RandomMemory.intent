@@ -1,7 +1,6 @@
-tell me a random memory
-tell me a memory
-pick a memory
-share a memory
-surprise me
-what's something you remember
-remember something
+(tell me|share|recall|recount) (a|one of your) random (memories|memory)
+(tell me|share|recall|recount) (a|one of your) memory
+(pick|choose) (a|one of your) (memories|memory)
+(surprise me (with a memory|)
+(what is|tell me) something (else|) (you remember|from your life)
+remember (something|anything)
