@@ -638,23 +638,22 @@ class NearTotalRecall(OVOSSkill):
         # Pick a random memory
         memory = random.choice(self.memory_data)
         memory_id = memory["Timestamp"]
+        era_name = memory.get("Era", "the past")
+        raw_title = memory.get("Title", "")
+        spoken_title = self._flip_pronouns(raw_title)
 
         # PUNCH LIST: Log the title
         self.log.info(f"🎲 Random Memory Selected: {memory.get('Title', 'Untitled')}")
-
-        # Grab the era directly from the memory dict
-        era_name = memory.get("Era", "past")
 
         # memory = results[0]  # Take the first match
         memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
 
         if memory_content:
-            self.speak_dialog("random_memory", {"era": era_name})
-            # Inside handle_random_memory_intent
-            raw_title = memory.get("Title", "")
-            spoken_title = self._flip_pronouns(raw_title)
-            if spoken_title:
-                self.speak(f"Oh, I remember {spoken_title}!", wait=False)
+            self.speak_dialog("random_memory", {
+                "title": spoken_title,
+                "era": era_name
+            }, wait=True)
+
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             if self.media_available:  # <== ADDED check
                 self.display_cover_image(memory)  # <== FIXED: pass full dict
