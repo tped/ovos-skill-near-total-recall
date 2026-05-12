@@ -53,7 +53,7 @@ class NearTotalRecall(OVOSSkill):
         self.learning = True
         self.is_reciting = False
 
-        # Placeholders to stop the warnings
+        """ # Placeholders to stop the warnings
         self.log_level = "INFO"
         self.enabled = False
         self.embeddings_path = ""
@@ -71,6 +71,7 @@ class NearTotalRecall(OVOSSkill):
         self.memory_data: list[dict] = []           # PyCharm: "Items inside are dictionaries"
         self.model: SentenceTransformer | None = None
         self.media_available = False
+        """
 
     def initialize(self):
         # merge default settings
