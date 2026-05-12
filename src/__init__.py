@@ -53,6 +53,25 @@ class NearTotalRecall(OVOSSkill):
         self.learning = True
         self.is_reciting = False
 
+        # Placeholders to stop the warnings
+        self.log_level = "INFO"
+        self.enabled = False
+        self.embeddings_path = ""
+        self.memories_data_path = ""
+        self.image_path = ""
+        self.media_folder = ""
+        self.display_mee_image = True
+        self.fallback_on = False
+        self.top_n: int = 3                         # PyCharm: "This is always a number"
+        self.similarity_threshold: float = 0.5      # PyCharm: "This is always a number"
+        self.model_name = ""
+        self.chunk_pause: float = 0.2               # PyCharm: "This is always a number"
+        self.max_chunk_size = 250
+        self.embeddings: np.ndarray | None = None   # PyCharm: "This is a numpy array"
+        self.memory_data: list[dict] = []           # PyCharm: "Items inside are dictionaries"
+        self.model: SentenceTransformer | None = None
+        self.media_available = False
+
     def initialize(self):
         # merge default settings
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
@@ -80,17 +99,17 @@ class NearTotalRecall(OVOSSkill):
         self.enabled = True  # an optimist!
 
         # Load settings from self.settings
-        self.embeddings_path = self.settings.get("embeddings_path")
-        self.memories_data_path = self.settings.get("memories_data_path")
-        self.image_path = self.settings.get("mee_image_path")
-        self.media_folder = self.settings.get("media_folder")
+        self.embeddings_path = self.settings.get("embeddings_path") or ""
+        self.memories_data_path = self.settings.get("memories_data_path") or ""
+        self.image_path = self.settings.get("mee_image_path") or ""
+        self.media_folder = self.settings.get("media_folder") or ""
 
-        self.display_mee_image = self.settings.get("display_mee_image")
-        self.fallback_on = self.settings.get("fallback_friendly")
-        self.top_n = self.settings.get("top_n")
-        self.similarity_threshold = self.settings.get("similarity_threshold")
-        self.model_name = self.settings.get("model_name")
-        self.chunk_pause = self.settings.get("chunk_pause_seconds")
+        self.display_mee_image = self.settings.get("display_mee_image") or ""
+        self.fallback_on = self.settings.get("fallback_friendly") or ""
+        self.top_n = self.settings.get("top_n", 3)
+        self.similarity_threshold = self.settings.get("similarity_threshold", 0.5)
+        self.model_name = self.settings.get("model_name") or ""
+        self.chunk_pause = self.settings.get("chunk_pause_seconds", 0.2)
         self.max_chunk_size = self.settings.get("max_tts_chunk_size", 250)
 
         # Initialize with paths to the memory_bank and embeddings.
@@ -108,7 +127,7 @@ class NearTotalRecall(OVOSSkill):
             self.log.info(f"Loaded {len(self.memory_data)} memories from JSON.")
         except Exception as e:
             self.log.error(f"Failed to load memory JSON: {e}")
-            self.memory_data = None
+            self.memory_data = []
             self.enabled = False
 
         try:
@@ -183,8 +202,12 @@ class NearTotalRecall(OVOSSkill):
         return re.sub(r'\s+', ' ', result).strip()
 
     def converse(self, message=None):
+        # 0.  Make sure we have a message
+        if message is None:
+            return False
         # 1. Get the text
-        utterances = message.data.get('utterances', [])
+        # Original:  utterances = message.data.get('utterances', [])
+        utterances = (message.data or {}).get('utterances', [])
         if not utterances:
             return False
         utt = utterances[0].lower().strip()
@@ -210,7 +233,7 @@ class NearTotalRecall(OVOSSkill):
         """
         This method searches for the most similar memories based on the query using cosine similarity or other methods.
         """
-        if self.memory_data is None or self.embeddings is None:
+        if self.memory_data is None or self.embeddings is None or self.model is None:
             self.log.error("Cleaned data or Embeddings not loaded.")
             return []
 
@@ -224,10 +247,10 @@ class NearTotalRecall(OVOSSkill):
 
         # Find the top N most similar memories
         top_n_indices = np.argsort(similarities)[::-1][:self.top_n]
-        # OLD results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp']) for i in
-        # OLD            top_n_indices]
-        results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp'],
-                    self.memory_data[i].get("Title", "")) for i in top_n_indices]
+        results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp']) for i in
+                    top_n_indices]
+        #results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp'],
+        #            self.memory_data[i].get("Title", "")) for i in top_n_indices]
 
         self.log.info("📊 Top memory matches:")
         for rank, (score, memory, memory_id, memory_title) in enumerate(results, start=1):
@@ -264,7 +287,8 @@ class NearTotalRecall(OVOSSkill):
                 # Use memory's TTS time, fallback to 20 if missing
                 # tts_time = memory.get("tts_time_seconds", 20)
                 # hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
-                self.gui.show_image(
+                if self.gui:
+                    self.gui.show_image(
                     cover_path,
                     fill="PreserveAspectFit",
                     override_idle=True
@@ -299,7 +323,8 @@ class NearTotalRecall(OVOSSkill):
 
         # Project image of MeeSelf (if option set)
         if self.display_mee_image:
-            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=hold_time)
+            if self.gui:
+                self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=hold_time)
 
         # Extract details
         description = memory['Memory_Description']
@@ -308,7 +333,7 @@ class NearTotalRecall(OVOSSkill):
 
         # Warn the user and offer summary if available
         if is_long:
-            response = self.get_response("long_story_warning")  # Ask user for choice
+            response = self.get_response("long_story_warning") or "" # Ask user for choice
             if "full" in response.lower() or "fall" in response.lower() or "all" in response.lower():
                 return description  # Explicit full request
             elif response and "summary" in response.lower() and has_summary:
@@ -325,7 +350,8 @@ class NearTotalRecall(OVOSSkill):
         """
         if not self.media_available:
             self.log.info("Visual recall skipped: Media folder not available.")
-            self.gui.release()  # GUI Release
+            if self.gui:
+                self.gui.release()  # GUI Release
             return
 
         raw_timestamp = memory_dict.get("Timestamp", "")
@@ -350,7 +376,8 @@ class NearTotalRecall(OVOSSkill):
         if not os.path.isdir(folder_path):
             self.log.warning(f"Visual recall skipped: Folder not found at {folder_path}")
             self.speak_dialog("end_of_memory")
-            self.gui.release()  # <-- CORRECTED: GUI Release
+            if self.gui:
+                self.gui.release()  # <-- CORRECTED: GUI Release
             return
 
         # --- 1. COUNT AND QUANTIFY ALL MEDIA ---
@@ -397,7 +424,8 @@ class NearTotalRecall(OVOSSkill):
             self.log.info("Visual recall: Only cover image or no media found.")
             # Dialog: "That's all I remember."
             self.speak_dialog("end_of_memory")
-            self.gui.release()  # GUI Release
+            if self.gui:
+                self.gui.release()  # GUI Release
             return
 
         # Determine the quantifier for the user dialog
@@ -434,7 +462,8 @@ class NearTotalRecall(OVOSSkill):
         else:
             self.log.info("User declined visual recall.")
             self.speak_dialog("visual_declined")
-            self.gui.release()
+            if self.gui:
+                self.gui.release()
             return
 
     @staticmethod
@@ -527,7 +556,7 @@ class NearTotalRecall(OVOSSkill):
     def handle_do_you_recall_intent(self, message):
         if not self.enabled:
             self.speak_dialog("ntr_disabled_due_to_error")
-            return
+            return False
 
         query = message.data.get("query", "")
         self.log.info(f"Received query for recall: {query}")
@@ -537,7 +566,7 @@ class NearTotalRecall(OVOSSkill):
         if exact_match:
             self.log.info(f"Found exact match for query: {query}")
             memory_dict = exact_match[0]  # <== ADDED: give it a name for clarity
-            memory_content = self.recall_full_memory(exact_match[0]['Timestamp'])
+            memory_content = self.recall_full_memory(exact_match[0]['Timestamp']) or ""
             if memory_content:
                 #
                 # Temporary Remove Title from preamble - titles may be third person
@@ -581,7 +610,7 @@ class NearTotalRecall(OVOSSkill):
             # self.speak(f"It's titled: {title}", wait=False)
 
             # memory = results[0]  # Take the first match
-            memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
+            memory_content = self.recall_full_memory(memory_id) or ""  # Use timestamp or similar for recall
 
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
@@ -599,12 +628,14 @@ class NearTotalRecall(OVOSSkill):
                     return False  # quietly pass on this one Fallback Friendly
                 else:
                     self.speak_dialog("no_memory_found")
+                    return True
         else:
             self.log.info(f"NO RESULTS! For query: {query}")
             if self.fallback_on:
                 return False  # quietly pass on this one Fallback Friendly
             else:
                 self.speak_dialog("no_memory_found")
+                return True
 
     @intent_handler("MemoryChecker.intent")
     def handle_memory_checker_intent(self, _message):
@@ -627,13 +658,13 @@ class NearTotalRecall(OVOSSkill):
             era_summary = era_list[0]
 
         self.speak(f"I have {total_memories} memories: {era_summary}.")
-        return
+        return True
 
     @intent_handler("RandomMemory.intent")
     def handle_random_memory_intent(self, _message):
         if not self.enabled:
             self.speak_dialog("ntr_disabled_due_to_error")
-            return
+            return False
 
         # Pick a random memory
         memory = random.choice(self.memory_data)
@@ -646,7 +677,7 @@ class NearTotalRecall(OVOSSkill):
         self.log.info(f"🎲 Random Memory Selected: {memory.get('Title', 'Untitled')}")
 
         # memory = results[0]  # Take the first match
-        memory_content = self.recall_full_memory(memory_id)  # Use timestamp or similar for recall
+        memory_content = self.recall_full_memory(memory_id) or "" # Use timestamp or similar for recall
 
         if memory_content:
             self.speak_dialog("random_memory", {
@@ -669,7 +700,7 @@ class NearTotalRecall(OVOSSkill):
                 return False  # quietly pass on this one Fallback Friendly
             else:
                 self.speak_dialog("no_memory_found")
-        return
+        return False
 
     @intent_handler("ThanksCatcher.intent")
     def handle_gratitude_poltergeist(self, _message):
@@ -687,7 +718,8 @@ class NearTotalRecall(OVOSSkill):
         if session.session_id in self.session_results:
             self.session_results.pop(session.session_id)
         if session.session_id == "default":
-            self.gui.release()
+            if self.gui:
+                self.gui.release()
 
         if self.is_reciting:
             self.is_reciting = False
