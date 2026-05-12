@@ -16,7 +16,7 @@
     "pip_spec": "ovos-skill-near-total-recall",
     "license": "# TODO: Add 'license' to .projenrc.json and run pj",
     "author": "Tom Pedersen",
-    "version": "1.0.2a5",
+    "version": "1.0.3a6",
     "url": "https://github.com/tped/ovos-skill-near-total-recall",
     "skill_id": "ovos-skill-near-total-recall.tped=ovos_skill_near_total_recall:NearTotalRecall",
     "skillname": "ovos-skill-near-total-recall",
