@@ -121,6 +121,7 @@ class NearTotalRecall(OVOSSkill):
             self.log.error(f"Failed to load embeddings: {e}")
             self.embeddings = None
             self.enabled = False
+            self.speak("NTR disabled:  Could not load Embeddings")
 
         try:
             with open(self.memories_data_path, 'r', encoding='utf-8') as f:
@@ -130,6 +131,7 @@ class NearTotalRecall(OVOSSkill):
             self.log.error(f"Failed to load memory JSON: {e}")
             self.memory_data = []
             self.enabled = False
+            self.speak("NTR disabled:  Could not load Memory Banks")
 
         try:
             self.model = SentenceTransformer(self.model_name)
@@ -137,6 +139,7 @@ class NearTotalRecall(OVOSSkill):
             self.log.error(f"Failed to load Sentence Transformer model: {e}")
             self.model = None
             self.enabled = False
+            self.speak("NTR disabled:  Could not load Sentence Transformer Model")
 
         if not os.path.isdir(self.media_folder):
             self.log.warning(f"Media folder does not exist: {self.media_folder}")
