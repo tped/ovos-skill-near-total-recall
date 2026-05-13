@@ -251,10 +251,8 @@ class NearTotalRecall(OVOSSkill):
 
         # Find the top N most similar memories
         top_n_indices = np.argsort(similarities)[::-1][:self.top_n]
-        results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp']) for i in
-                    top_n_indices]
-        #results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp'],
-        #            self.memory_data[i].get("Title", "")) for i in top_n_indices]
+        results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp'],
+                    self.memory_data[i].get("Title", "")) for i in top_n_indices]
 
         self.log.info("📊 Top memory matches:")
         for rank, (score, memory, memory_id, memory_title) in enumerate(results, start=1):
@@ -285,22 +283,23 @@ class NearTotalRecall(OVOSSkill):
         folder_path = os.path.join(self.media_folder, folder_name)
 
         # Look for the first valid cover image
+        # Look for the first valid cover image
+        found_photo = False
         for ext in [".jpg", ".jpeg", ".png"]:
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
-                # Use memory's TTS time, fallback to 20 if missing
-                # tts_time = memory.get("tts_time_seconds", 20)
-                # hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
                 if self.gui:
-                    self.gui.show_image(
-                    cover_path,
-                    fill="PreserveAspectFit",
-                    override_idle=True
-                )
-                self.log.info(f"✅ Found cover image ({cover_path}) — displaying it.")
-                return
+                    self.gui.show_image(cover_path, fill="PreserveAspectFit", override_idle=True)
+                self.log.info(f"✅ Found cover image ({cover_path})")
+                found_photo = True
+                break
 
-        self.log.info("❌ No cover image (jpg/jpeg/png) found for this memory.")
+        # FALLBACK: If no specific photo was found, show the MeeSelf avatar
+        if not found_photo and self.display_mee_image:
+            if self.gui:
+                # Use a default hold time if we don't have the memory's TTS time yet
+                self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=True)
+            self.log.info("👤 No memory photo found - showing MeeSelf avatar instead.")
 
     def recall_full_memory(self, memory_id):
         """
@@ -322,13 +321,15 @@ class NearTotalRecall(OVOSSkill):
         memory = memory_row[0]
 
         # Use memory's TTS time, fallback to 20 if missing
-        tts_time = memory.get("tts_time_seconds", 20)
-        hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
+        # De-implemented
+        #tts_time = memory.get("tts_time_seconds", 20)
+        #hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
 
         # Project image of MeeSelf (if option set)
-        if self.display_mee_image:
-            if self.gui:
-                self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=hold_time)
+        # let display_cover decide this
+        # if self.display_mee_image:
+        #    if self.gui:
+        #        self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=hold_time)
 
         # Extract details
         description = memory['Memory_Description']
@@ -572,9 +573,6 @@ class NearTotalRecall(OVOSSkill):
             memory_dict = exact_match[0]  # <== ADDED: give it a name for clarity
             memory_content = self.recall_full_memory(exact_match[0]['Timestamp']) or ""
             if memory_content:
-                #
-                # Temporary Remove Title from preamble - titles may be third person
-                #
                 # speak memory title immediately after
                 # title = memory_dict.get("Title", "this one")
                 # self.speak(f"I clearly remember {title}!", wait=False)
@@ -602,10 +600,11 @@ class NearTotalRecall(OVOSSkill):
             mem_type = memory_dict.get("Memory_Type", "personal") or "personal"
 
             # speak preamble from memory_found.dialog
+            # CHANGED: wait=True prevents her from starting the recital before finishing this intro
             self.speak_dialog(
                 "memory_found",
                 {"era_name": era_name, "mem_type": mem_type},
-                wait=False
+                wait=True
             )
 
             # ### Temp Remove Title speak - we need to watch for third person
@@ -680,23 +679,26 @@ class NearTotalRecall(OVOSSkill):
         # PUNCH LIST: Log the title
         self.log.info(f"🎲 Random Memory Selected: {memory.get('Title', 'Untitled')}")
 
+        # 2. INTRODUCE it first (MeePi speaks the title and era)
+        # We use wait=True so she finishes this before asking for full/summary
+        self.speak_dialog("random_memory", {
+            "title": spoken_title,
+            "era": era_name
+        }, wait=True)
+
         # memory = results[0]  # Take the first match
         memory_content = self.recall_full_memory(memory_id) or "" # Use timestamp or similar for recall
 
         if memory_content:
-            self.speak_dialog("random_memory", {
-                "title": spoken_title,
-                "era": era_name
-            }, wait=True)
-
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             if self.media_available:  # <== ADDED check
                 self.display_cover_image(memory)  # <== FIXED: pass full dict
-            # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
+            
+            # Using buffered recital for the 'Stop' shield
             self.speak_buffered(dialog_file, memory_content)
-            # NEW: Hand off to Visual Recall
+            
+            # Hand off to Visual Recall
             self.send_visual_recall_request(memory)
-            # self.gui.release() - send_visual will take care of this
             return True  # Fallback Friendly
         else:
             self.log.info(f"RESULTS but NO CONTENT For Random Memory")
