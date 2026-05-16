@@ -556,6 +556,10 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("ntr_disabled_due_to_error")
             return False
 
+        # Show MeeSelf immediately so user knows intent was received
+        if self.gui and self.display_mee_image:
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=60)
+
         query = message.data.get("query", "")
         self.log.info(f"Received query for recall: {query}")
 
@@ -654,6 +658,10 @@ class NearTotalRecall(OVOSSkill):
         if not self.enabled:
             self.speak_dialog("ntr_disabled_due_to_error")
             return False
+
+        # Show MeeSelf immediately so user knows intent was received
+        if self.gui and self.display_mee_image:
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=60)
 
         # Pick a random memory
         memory = random.choice(self.memory_data)
