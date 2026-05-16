@@ -264,9 +264,19 @@ class NearTotalRecall(OVOSSkill):
         return results
 
     def display_cover_image(self, memory):
-        """If a cover image exists for the memory, show it on the GUI."""
+        """Show MeeSelf avatar immediately, then replace with cover image if one exists."""
         raw_timestamp = memory.get("Timestamp", "")
         raw_title = memory.get("Title", "")
+
+        # Estimate hold time from memory word count (roughly 2.5 words/second)
+        description = memory.get("Memory_Description", "")
+        word_count = len(description.split())
+        hold_time = max(20, int(word_count / 2.5) + 5)
+
+        # ALWAYS show MeeSelf first — no gap, no OVOS logo flash
+        if self.gui and self.display_mee_image:
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=hold_time)
+            self.log.info("👤 MeeSelf avatar displayed.")
 
         # Convert human-readable timestamp to sortable format
         try:
@@ -281,24 +291,14 @@ class NearTotalRecall(OVOSSkill):
         folder_name = f"{sortable_ts}_{safe_title}"
         folder_path = os.path.join(self.media_folder, folder_name)
 
-        # Look for the first valid cover image
-        # Look for the first valid cover image
-        found_photo = False
+        # OVERLAY: Replace MeeSelf with cover image if one exists
         for ext in [".jpg", ".jpeg", ".png"]:
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
                 if self.gui:
-                    self.gui.show_image(cover_path, fill="PreserveAspectFit", override_idle=True)
-                self.log.info(f"✅ Found cover image ({cover_path})")
-                found_photo = True
+                    self.gui.show_image(cover_path, fill="PreserveAspectFit", override_idle=hold_time)
+                    self.log.info(f"🖼 Cover image overlaid ({cover_path})")
                 break
-
-        # FALLBACK: If no specific photo was found, show the MeeSelf avatar
-        if not found_photo and self.display_mee_image:
-            if self.gui:
-                # Use a default hold time if we don't have the memory's TTS time yet
-                self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=True)
-            self.log.info("👤 No memory photo found - showing MeeSelf avatar instead.")
 
     def recall_full_memory(self, memory_id):
         """
@@ -323,12 +323,6 @@ class NearTotalRecall(OVOSSkill):
         # De-implemented
         #tts_time = memory.get("tts_time_seconds", 20)
         #hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
-
-        # Project image of MeeSelf (if option set)
-        # let display_cover decide this
-        # if self.display_mee_image:
-        #    if self.gui:
-        #        self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=hold_time)
 
         # Extract details
         description = memory['Memory_Description']
