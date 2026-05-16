@@ -10,7 +10,6 @@ import re
 import json
 import random
 import time
-import math
 import filecmp
 from datetime import datetime
 import numpy as np
@@ -105,8 +104,8 @@ class NearTotalRecall(OVOSSkill):
         self.image_path = self.settings.get("mee_image_path") or ""
         self.media_folder = self.settings.get("media_folder") or ""
 
-        self.display_mee_image = self.settings.get("display_mee_image") or ""
-        self.fallback_on = self.settings.get("fallback_friendly") or ""
+        self.display_mee_image = self.settings.get("display_mee_image", True)
+        self.fallback_on = self.settings.get("fallback_friendly", False)
         self.top_n = self.settings.get("top_n", 3)
         self.similarity_threshold = self.settings.get("similarity_threshold", 0.5)
         self.model_name = self.settings.get("model_name") or ""
@@ -577,8 +576,7 @@ class NearTotalRecall(OVOSSkill):
                 # title = memory_dict.get("Title", "this one")
                 # self.speak(f"I clearly remember {title}!", wait=False)
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-                if self.media_available:
-                    self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
+                self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
                 # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
                 self.speak_buffered(dialog_file, memory_content)
                 # NEW: Hand off to Visual Recall (handles GUI release internally)
@@ -607,18 +605,12 @@ class NearTotalRecall(OVOSSkill):
                 wait=True
             )
 
-            # ### Temp Remove Title speak - we need to watch for third person
-            # speak memory title immediately after
-            # title = memory_dict.get("Title", "this one")
-            # self.speak(f"It's titled: {title}", wait=False)
-
             # memory = results[0]  # Take the first match
             memory_content = self.recall_full_memory(memory_id) or ""  # Use timestamp or similar for recall
 
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-                if self.media_available:  # <== ADDED check
-                    self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
+                self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
                 self.speak_buffered(dialog_file, memory_content)
                 # Release GUI only when done with intent
                 # NEW: Hand off to Visual Recall (handles GUI release internally)
@@ -691,9 +683,7 @@ class NearTotalRecall(OVOSSkill):
 
         if memory_content:
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-            if self.media_available:  # <== ADDED check
-                self.display_cover_image(memory)  # <== FIXED: pass full dict
-            
+            self.display_cover_image(memory)  # <== FIXED: pass full dict
             # Using buffered recital for the 'Stop' shield
             self.speak_buffered(dialog_file, memory_content)
             
