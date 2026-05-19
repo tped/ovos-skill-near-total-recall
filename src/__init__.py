@@ -82,12 +82,7 @@ class NearTotalRecall(OVOSSkill):
 
         # Some Debug stuff ....
         # Safely detect if GUI is available
-        if self.gui:
-            self.gui_mode = True
-            self.speak("GUI detected and enabled.")
-        else:
-            self.gui_mode = False
-            self.speak("self.gui is NOT set - GUI MODE forced on")
+
 
         # Speak version if log_level != INFO
         if self.log_level.upper() != "INFO":
@@ -97,6 +92,13 @@ class NearTotalRecall(OVOSSkill):
                 f"MeePi Near Total Recall, version {spoken_version}, initialized",
                 wait=False
             )
+            # Safety check - report gui state
+            if self.gui:
+                # self.gui_mode = True
+                self.speak("GUI detected and enabled.")
+            else:
+                # self.gui_mode = False
+                self.speak("self.gui is NOT set - GUI MODE forced on")
 
         self.log.info(f"Done with Initialize")
 
@@ -283,7 +285,7 @@ class NearTotalRecall(OVOSSkill):
         hold_time = max(20, int(word_count / 2.5) + 5)
 
         # ALWAYS show MeeSelf first — no gap, no OVOS logo flash
-        if self.gui_mode and self.display_mee_image:  # temp, don't trust self.gui
+        if self.gui and self.display_mee_image:  # temp, don't trust self.gui
             self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=hold_time)
             self.log.info("👤 MeeSelf avatar displayed.")
 
@@ -304,7 +306,7 @@ class NearTotalRecall(OVOSSkill):
         for ext in [".jpg", ".jpeg", ".png"]:
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
-                if self.gui_mode:
+                if self.gui:
                     self.gui.show_image(cover_path, fill="PreserveAspectFit", override_idle=hold_time)
                     self.log.info(f"🖼 Cover image overlaid ({cover_path})")
                 break
@@ -357,7 +359,7 @@ class NearTotalRecall(OVOSSkill):
         """
         if not self.media_available:
             self.log.info("Visual recall skipped: Media folder not available.")
-            if self.gui_mode:
+            if self.gui:
                 self.gui.release()  # GUI Release
             return
 
@@ -383,7 +385,7 @@ class NearTotalRecall(OVOSSkill):
         if not os.path.isdir(folder_path):
             self.log.warning(f"Visual recall skipped: Folder not found at {folder_path}")
             self.speak_dialog("end_of_memory")
-            if self.gui_mode:
+            if self.gui:
                 self.gui.release()  # <-- CORRECTED: GUI Release
             return
 
@@ -431,7 +433,7 @@ class NearTotalRecall(OVOSSkill):
             self.log.info("Visual recall: Only cover image or no media found.")
             # Dialog: "That's all I remember."
             self.speak_dialog("end_of_memory")
-            if self.gui_mode:
+            if self.gui:
                 self.gui.release()  # GUI Release
             return
 
@@ -457,6 +459,13 @@ class NearTotalRecall(OVOSSkill):
 
         if response and self.voc_match(response, "yes"):
             self.log.info(f"User confirmed: Sending visual recall request for {media_count} items.")
+            # --- BRIDGE THE GAP ---
+            # Re-show the current image to prevent the OVOS logo from flashing
+            # while the Visual Recall skill is loading.
+            if self.gui:
+                image_to_hold = cover_path if cover_path else self.image_path
+                self.gui.show_image(image_to_hold, fill='PreserveAspectFit', override_idle=20)
+
             self.bus.emit(
                 Message(
                     "visual.recall.display",  # The event registered in the VR skill
@@ -466,10 +475,14 @@ class NearTotalRecall(OVOSSkill):
                     }
                 )
             )
+
+            # Wait a moment for VR to "pickup" the screen before we exit
+            time.sleep(1.2)
+
         else:
             self.log.info("User declined visual recall.")
             self.speak_dialog("visual_declined")
-            if self.gui_mode:
+            if self.gui:
                 self.gui.release()
             return
 
@@ -566,7 +579,7 @@ class NearTotalRecall(OVOSSkill):
             return False
 
         # Show MeeSelf immediately so user knows intent was received
-        if self.gui_mode and self.display_mee_image:
+        if self.gui and self.display_mee_image:
             self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=60)
 
         query = message.data.get("query", "")
@@ -669,7 +682,7 @@ class NearTotalRecall(OVOSSkill):
             return False
 
         # Show MeeSelf immediately so user knows intent was received
-        if self.gui_mode and self.display_mee_image:
+        if self.gui and self.display_mee_image:
             self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=60)
 
         # Pick a random memory
@@ -725,7 +738,7 @@ class NearTotalRecall(OVOSSkill):
         if session.session_id in self.session_results:
             self.session_results.pop(session.session_id)
         if session.session_id == "default":
-            if self.gui_mode:
+            if self.gui:
                 self.gui.release()
 
         if self.is_reciting:
