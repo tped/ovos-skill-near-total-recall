@@ -722,6 +722,61 @@ class NearTotalRecall(OVOSSkill):
                 self.speak_dialog("no_memory_found")
         return False
 
+    @intent_handler("RandomMemoryFromEra.intent")
+    def handle_random_memory_from_era_intent(self, message):
+        if not self.enabled:
+            self.speak_dialog("ntr_disabled_due_to_error")
+            return False
+
+        # 1. Get requested era from the intent
+        requested_era = message.data.get("era", "").lower().strip()
+        if not requested_era:
+            return self.handle_random_memory_intent(message)
+
+        # 2. Filter memories by era
+        # We check if requested_era is IN the memory's era (e.g. "1960" matches "1960s")
+        era_matches = [
+            m for m in self.memory_data
+            if m.get("Era") and requested_era in m.get("Era").lower()
+        ]
+
+        if not era_matches:
+            self.log.info(f"No memories found for era: {requested_era}")
+            self.speak_dialog("no_memories_for_era", {"era": requested_era})
+            return True
+
+        # 3. Pick a random match
+        memory = random.choice(era_matches)
+
+        # 4. Standard Display/Recite logic
+        if self.gui and self.display_mee_image:
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=60)
+
+        memory_id = memory["Timestamp"]
+        era_name = memory.get("Era", "that era")
+        raw_title = memory.get("Title", "")
+        spoken_title = self._flip_pronouns(raw_title)
+
+        self.log.info(f"🎲 Random {era_name} Memory Selected: {raw_title}")
+
+        # Speak the intro
+        self.speak_dialog("random_memory", {
+            "title": spoken_title,
+            "era": era_name
+        }, wait=True)
+
+        # Retrieve and speak content
+        memory_content = self.recall_full_memory(memory_id) or ""
+        if memory_content:
+            dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
+            self.display_cover_image(memory)
+            self.speak_buffered(dialog_file, memory_content)
+            self.send_visual_recall_request(memory)
+            return True
+        else:
+            self.speak_dialog("no_memory_found")
+            return False
+
     @intent_handler("ThanksCatcher.intent")
     def handle_gratitude_poltergeist(self, _message):
         self.log.info("🩹 Caught stray 'thank you' — likely OVOS bug.")
