@@ -25,6 +25,7 @@ from .version import (
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
+    "birth_date": "1958-05-20",  # Set to your birthdate!
     "embeddings_path": "/home/ovos/NTR-Data/MeePiEmbeddings.npy",
     "memories_data_path": "/home/ovos/NTR-Data/MeePiMemoryBank.json",
     "mee_image_path": "/home/ovos/NTR-Data/cover.jpg",
@@ -79,10 +80,6 @@ class NearTotalRecall(OVOSSkill):
         self.log_level = self.settings.get("log_level", "INFO")
 
         self.load_databanks()
-
-        # Some Debug stuff ....
-        # Safely detect if GUI is available
-
 
         # Speak version if log_level != INFO
         if self.log_level.upper() != "INFO":
@@ -214,6 +211,48 @@ class NearTotalRecall(OVOSSkill):
 
         # Cleanup whitespace
         return re.sub(r'\s+', ' ', result).strip()
+
+    def _map_user_query_to_era(self, query):
+        """Translates natural language queries into MeePi Era categories."""
+        query = query.lower()
+
+        # 1. Simple Keyword Mapping
+        mapping = {
+            "childhood": ["childhood", "kid", "child", "growing up", "little", "elementary"],
+            "teenage": ["teenage", "teens", "high school", "adolescent", "junior high"],
+            "twenties": ["twenties", "20s", "college", "young adult"],
+            "midlife": ["midlife", "middle age", "thirties", "forties", "fifties", "30s", "40s", "50s"],
+            "senior": ["senior", "retirement", "sixties", "70s", "80s", "90s"],
+            "encore": ["encore", "recent", "lately", "now", "today"]
+        }
+
+        for era, synonyms in mapping.items():
+            if any(syn in query for syn in synonyms):
+                return era
+
+        # 2. Decade & Year Math
+        # Matches "1975" or "70s"
+        match = re.search(r"(\d{4}|\d{2})s?", query)
+        if match:
+            year_val = int(match.group(1))
+            if year_val < 100:
+                year_val += 1900
+
+            birth_str = self.settings.get("birth_date", "1958-05-20")
+            try:
+                birth_year = int(birth_str.split("-")[0])
+            except (ValueError, IndexError):
+                birth_year = 1958
+
+            age_at_time = year_val - birth_year
+
+            if age_at_time < 13: return "childhood"
+            if age_at_time < 20: return "teenage"
+            if age_at_time < 30: return "twenties"
+            if age_at_time < 60: return "midlife"
+            return "senior"
+
+        return query  # Fallback to exactly what was said
 
     def converse(self, message=None):
         # 0.  Make sure we have a message
@@ -728,13 +767,19 @@ class NearTotalRecall(OVOSSkill):
             self.speak_dialog("ntr_disabled_due_to_error")
             return False
 
-        # 1. Get requested era from the intent
-        requested_era = message.data.get("era", "").lower().strip()
-        if not requested_era:
-            return self.handle_random_memory_intent(message)
+        # Show MeeSelf immediately if GUI is available
+        if self.gui and self.display_mee_image:
+            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=60)
 
-        # 2. Filter memories by era
-        # We check if requested_era is IN the memory's era (e.g. "1960" matches "1960s")
+        # 1. Get query and flip persona: "when you were" -> "when I was"
+        raw_query = message.data.get("era", "").lower().strip()
+        flipped_query = raw_query.replace("you were", "i was").replace("your", "my")
+
+        # 2. Map to internal Era category
+        requested_era = self._map_user_query_to_era(flipped_query)
+        self.log.info(f"NTR: Era request '{raw_query}' mapped to '{requested_era}'")
+
+        # 3. Filter memories
         era_matches = [
             m for m in self.memory_data
             if m.get("Era") and requested_era in m.get("Era").lower()
@@ -742,30 +787,21 @@ class NearTotalRecall(OVOSSkill):
 
         if not era_matches:
             self.log.info(f"No memories found for era: {requested_era}")
-            self.speak_dialog("no_memories_for_era", {"era": requested_era})
+            # Use raw_query so she says "I don't have memories from when you were..."
+            self.speak_dialog("no_memories_for_era", {"era": raw_query})
             return True
 
-        # 3. Pick a random match
+        # 4. Pick random and play
         memory = random.choice(era_matches)
-
-        # 4. Standard Display/Recite logic
-        if self.gui and self.display_mee_image:
-            self.gui.show_image(self.image_path, fill='PreserveAspectFit', override_idle=60)
-
         memory_id = memory["Timestamp"]
-        era_name = memory.get("Era", "that era")
-        raw_title = memory.get("Title", "")
-        spoken_title = self._flip_pronouns(raw_title)
+        era_name = memory.get("Era", "the past")
+        spoken_title = self._flip_pronouns(memory.get("Title", ""))
 
-        self.log.info(f"🎲 Random {era_name} Memory Selected: {raw_title}")
-
-        # Speak the intro
         self.speak_dialog("random_memory", {
             "title": spoken_title,
             "era": era_name
         }, wait=True)
 
-        # Retrieve and speak content
         memory_content = self.recall_full_memory(memory_id) or ""
         if memory_content:
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
@@ -773,9 +809,9 @@ class NearTotalRecall(OVOSSkill):
             self.speak_buffered(dialog_file, memory_content)
             self.send_visual_recall_request(memory)
             return True
-        else:
-            self.speak_dialog("no_memory_found")
-            return False
+
+        return False
+
 
     @intent_handler("ThanksCatcher.intent")
     def handle_gratitude_poltergeist(self, _message):
