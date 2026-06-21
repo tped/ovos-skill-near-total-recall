@@ -15,6 +15,8 @@ from datetime import datetime
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from collections import Counter
+from sklearn.metrics.pairwise import cosine_similarity
+from rapidfuzz import fuzz
 
 from .version import (
     VERSION_MAJOR,
@@ -38,7 +40,13 @@ DEFAULT_SETTINGS = {
     "similarity_threshold": 0.32,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2",  # Embedding model
     "chunk_pause_seconds": 0.2,  # Paragraph chunking pause (seconds)
-    "max_tts_chunk_size": 300   # Max Characters per TTS call
+    "max_tts_chunk_size": 300,  # Max Characters per TTS call
+
+    # Hybrid search weights (must sum to 1.0)
+    # Semantic: embedding cosine similarity (good for concepts, context)
+    # Keyword:  rapidfuzz + exact token matching (good for names, places)
+    "semantic_weight": 0.60,
+    "keyword_weight":  0.40
 }
 
 
@@ -119,6 +127,8 @@ class NearTotalRecall(OVOSSkill):
         self.model_name = self.settings.get("model_name") or ""
         self.chunk_pause = self.settings.get("chunk_pause_seconds", 0.2)
         self.max_chunk_size = self.settings.get("max_tts_chunk_size", 250)
+        self.semantic_weight = self.settings.get("semantic_weight", 0.60)
+        self.keyword_weight = self.settings.get("keyword_weight", 0.40)
 
         # Initialize with paths to the memory_bank and embeddings.
 
@@ -282,28 +292,74 @@ class NearTotalRecall(OVOSSkill):
             # 4. If we aren't reciting, let the brain work normally
         return False
 
+    @staticmethod
+    def prep_for_math(text):
+        """Normalize text for keyword scoring: lowercase, expand hyphens, strip punctuation."""
+        if not isinstance(text, str): return ""
+        text = text.lower()
+        text = text.replace("pedersen", "pedersen peterson peederson")
+        text = text.replace("-", " ")  # hyphens become spaces BEFORE stripping
+        text = re.sub(r"[^a-z0-9\s]", "", text)
+        return text
+
+    @staticmethod
+    def scrub_query(q):
+        """Strip intent carrier phrases from the raw query before scoring."""
+        q = q.lower()
+        stops = ["tell me about", "do you remember", "what is", "recall", "the"]
+        for word in stops: q = q.replace(word, "")
+        return NearTotalRecall.prep_for_math(q).strip()
+
     def find_closest_memory(self, query):
         """
-        This method searches for the most similar memories based on the query using cosine similarity or other methods.
+        Hybrid search: weighted combination of semantic (cosine similarity)
+        and keyword (rapidfuzz + exact token + sidekick bonus) scoring.
         """
         if self.memory_data is None or self.embeddings is None or self.model is None:
-            self.log.error("Cleaned data or Embeddings not loaded.")
+            self.log.error("Memory data or embeddings not loaded.")
             return []
 
-        self.log.info(f"🔍 Finding closest memory for query: '{query}'")
+        self.log.info(f"🔍 Hybrid search for query: '{query}'")
 
-        # OLD Use the model to encode the query
-        query_embedding = self.model.encode([query])
+        clean_q = self.scrub_query(query)
+        q_vec = self.model.encode([clean_q])
+        q_tokens = clean_q.split()
 
-        # Compute similarity between query and all memory embeddings
-        similarities = np.dot(self.embeddings, query_embedding.T).flatten()
+        # ── Semantic scores ──────────────────────────────────────────────
+        sem_scores = cosine_similarity(q_vec, self.embeddings)[0]
 
-        # Find the top N most similar memories
-        top_n_indices = np.argsort(similarities)[::-1][:self.top_n]
-        results = [(similarities[i], self.memory_data[i], self.memory_data[i]['Timestamp'],
-                    self.memory_data[i].get("Title", "")) for i in top_n_indices]
+        # ── Keyword scores ───────────────────────────────────────────────
+        keyword_boost = np.zeros(len(self.memory_data))
+        for i, memory in enumerate(self.memory_data):
+            title = str(memory.get('Title', '')).lower()
+            sidekicks = str(memory.get('Sidekicks', '')).lower()
+            candidate = self.prep_for_math(title + " " + sidekicks)
 
-        self.log.info("📊 Top memory matches:")
+            # Tier 1: fuzzy partial match across title+sidekicks
+            ratio = fuzz.partial_ratio(clean_q, candidate) / 100.0
+
+            # Tier 2: exact token hits in title+sidekicks
+            exact_hits = sum(1 for tok in q_tokens if tok in candidate)
+            exact_bonus = exact_hits * 0.15
+
+            # Tier 3: exact token hits in sidekicks only (hand-curated = stronger signal)
+            sidekick_tokens = self.prep_for_math(sidekicks).split()
+            sidekick_hits = sum(1 for tok in q_tokens if tok in sidekick_tokens)
+            sidekick_bonus = sidekick_hits * 0.35
+
+            keyword_boost[i] = (ratio * 0.3) + exact_bonus + sidekick_bonus
+
+        # ── Combined score ───────────────────────────────────────────────
+        combined = (sem_scores * self.semantic_weight) + (keyword_boost * self.keyword_weight)
+        top_idx = combined.argsort()[-self.top_n:][::-1]
+
+        results = [
+            (combined[i], self.memory_data[i], self.memory_data[i]['Timestamp'],
+             self.memory_data[i].get('Title', ''))
+            for i in top_idx
+        ]
+
+        self.log.info("📊 Top hybrid matches:")
         for rank, (score, memory, memory_id, memory_title) in enumerate(results, start=1):
             self.log.info(f"  {rank}. Title: '{memory_title}' | Score: {score:.4f}")
 
