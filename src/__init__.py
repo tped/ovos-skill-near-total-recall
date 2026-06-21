@@ -398,13 +398,17 @@ class NearTotalRecall(OVOSSkill):
         folder_path = os.path.join(self.media_folder, folder_name)
 
         # OVERLAY: Replace MeeSelf with cover image if one exists
+        final_image = self.image_path  # default to MeeSelf
         for ext in [".jpg", ".jpeg", ".png"]:
             cover_path = os.path.join(folder_path, f"cover{ext}")
             if os.path.exists(cover_path):
                 if self.gui:
                     self.gui.show_image(cover_path, fill="PreserveAspectFit", override_idle=hold_time)
                     self.log.info(f"🖼 Cover image overlaid ({cover_path})")
+                final_image = cover_path
                 break
+
+        return final_image
 
     def recall_full_memory(self, memory_id):
         """
@@ -609,7 +613,7 @@ class NearTotalRecall(OVOSSkill):
 
         return chunks
 
-    def speak_buffered(self, dialog_file: str, text: str):
+    def speak_buffered(self, dialog_file: str, text: str, image_path: str = None, hold_per_refresh: int = 30):
         if not text:
             return
 
@@ -627,6 +631,10 @@ class NearTotalRecall(OVOSSkill):
 
                 # HEARTBEAT: Keep skill active so Shield stays up
                 self.activate()
+
+                # Refresh image hold timer each paragraph
+                if image_path and self.gui:
+                    self.gui.show_image(image_path, fill='PreserveAspectFit', override_idle=hold_per_refresh)
 
                 # --- LOGIC START ---
                 text_to_chunk = p
@@ -691,9 +699,8 @@ class NearTotalRecall(OVOSSkill):
                 # title = memory_dict.get("Title", "this one")
                 # self.speak(f"I clearly remember {title}!", wait=False)
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-                self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
-                # self.speak_dialog(dialog_file, {"memory": memory_content}, wait=True)
-                self.speak_buffered(dialog_file, memory_content)
+                cover = self.display_cover_image(memory_dict)
+                self.speak_buffered(dialog_file, memory_content, image_path=cover)
                 # NEW: Hand off to Visual Recall (handles GUI release internally)
                 self.send_visual_recall_request(memory_dict)
                 return True  # Fallback Friendly 3
@@ -725,8 +732,8 @@ class NearTotalRecall(OVOSSkill):
 
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-                self.display_cover_image(memory_dict)  # <== FIXED: pass full dict
-                self.speak_buffered(dialog_file, memory_content)
+                cover = self.display_cover_image(memory_dict)
+                self.speak_buffered(dialog_file, memory_content, image_path=cover)
                 # Release GUI only when done with intent
                 # NEW: Hand off to Visual Recall (handles GUI release internally)
                 self.send_visual_recall_request(memory_dict)
@@ -802,9 +809,8 @@ class NearTotalRecall(OVOSSkill):
 
         if memory_content:
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-            self.display_cover_image(memory)  # <== FIXED: pass full dict
-            # Using buffered recital for the 'Stop' shield
-            self.speak_buffered(dialog_file, memory_content)
+            cover = self.display_cover_image(memory)
+            self.speak_buffered(dialog_file, memory_content, image_path=cover)
             
             # Hand off to Visual Recall
             self.send_visual_recall_request(memory)
@@ -861,8 +867,8 @@ class NearTotalRecall(OVOSSkill):
         memory_content = self.recall_full_memory(memory_id) or ""
         if memory_content:
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
-            self.display_cover_image(memory)
-            self.speak_buffered(dialog_file, memory_content)
+            cover = self.display_cover_image(memory)
+            self.speak_buffered(dialog_file, memory_content, image_path=cover)
             self.send_visual_recall_request(memory)
             return True
 
