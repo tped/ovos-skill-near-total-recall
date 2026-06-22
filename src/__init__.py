@@ -613,6 +613,19 @@ class NearTotalRecall(OVOSSkill):
 
         return chunks
 
+    def speak_simple(self, dialog_file: str, text: str, image_path: str = None, hold_per_refresh: int = 30):
+        """Simple speak - let OVOS handle the TTS queue directly."""
+        if not text:
+            return
+
+        self.is_reciting = True
+        try:
+            if image_path and self.gui:
+                self.gui.show_image(image_path, fill='PreserveAspectFit', override_idle=hold_per_refresh)
+            self.speak_dialog(dialog_file, {"memory": text}, wait=True)
+        finally:
+            self.is_reciting = False
+
     def speak_buffered(self, dialog_file: str, text: str, image_path: str = None, hold_per_refresh: int = 30):
         if not text:
             return
@@ -700,7 +713,8 @@ class NearTotalRecall(OVOSSkill):
                 # self.speak(f"I clearly remember {title}!", wait=False)
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 cover = self.display_cover_image(memory_dict)
-                self.speak_buffered(dialog_file, memory_content, image_path=cover)
+                self.speak_simple(dialog_file, memory_content, image_path=cover)
+                # self.speak_buffered(dialog_file, memory_content, image_path=cover)
                 # NEW: Hand off to Visual Recall (handles GUI release internally)
                 self.send_visual_recall_request(memory_dict)
                 return True  # Fallback Friendly 3
@@ -733,7 +747,8 @@ class NearTotalRecall(OVOSSkill):
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 cover = self.display_cover_image(memory_dict)
-                self.speak_buffered(dialog_file, memory_content, image_path=cover)
+                # self.speak_buffered(dialog_file, memory_content, image_path=cover)
+                self.speak_simple(dialog_file, memory_content, image_path=cover)
                 # Release GUI only when done with intent
                 # NEW: Hand off to Visual Recall (handles GUI release internally)
                 self.send_visual_recall_request(memory_dict)
@@ -810,7 +825,8 @@ class NearTotalRecall(OVOSSkill):
         if memory_content:
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             cover = self.display_cover_image(memory)
-            self.speak_buffered(dialog_file, memory_content, image_path=cover)
+            # self.speak_buffered(dialog_file, memory_content, image_path=cover)
+            self.speak_simple(dialog_file, memory_content, image_path=cover)
             
             # Hand off to Visual Recall
             self.send_visual_recall_request(memory)
@@ -868,12 +884,12 @@ class NearTotalRecall(OVOSSkill):
         if memory_content:
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             cover = self.display_cover_image(memory)
-            self.speak_buffered(dialog_file, memory_content, image_path=cover)
+            # self.speak_buffered(dialog_file, memory_content, image_path=cover)
+            self.speak_simple(dialog_file, memory_content, image_path=cover)
             self.send_visual_recall_request(memory)
             return True
 
         return False
-
 
     @intent_handler("ThanksCatcher.intent")
     def handle_gratitude_poltergeist(self, _message):
