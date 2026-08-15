@@ -89,6 +89,11 @@ class NearTotalRecall(OVOSSkill):
 
         self.load_databanks()
 
+        # Speak state off fallback if log_level != INFO
+        if self.log_level.upper() != "INFO":
+            if self.fallback_on:
+                self.speak(f"MeePi's Artificial Brain enabled")
+
         # Speak version if log_level != INFO
         if self.log_level.upper() != "INFO":
             ver = self.skill_version()
