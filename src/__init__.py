@@ -756,7 +756,11 @@ class NearTotalRecall(OVOSSkill):
                 self.log.info(f"RESULTS but NO CONTENT For query: {query}")
                 if self.fallback_on:
                     self.speak_dialog("checking_artificial_brain")
-                    return False  # quietly pass on this one Fallback Friendly
+                    self.bus.emit(Message("persona:query", {
+                        "utterance": query,
+                        "lang": self.lang
+                    }))
+                    return True  # NTR handled it by delegating — no more waiting on the pipeline
                 else:
                     self.speak_dialog("no_memory_found")
                     return True
@@ -764,7 +768,11 @@ class NearTotalRecall(OVOSSkill):
             self.log.info(f"NO RESULTS! For query: {query}")
             if self.fallback_on:
                 self.speak_dialog("checking_artificial_brain")
-                return False  # quietly pass on this one Fallback Friendly
+                self.bus.emit(Message("persona:query", {
+                    "utterance": query,
+                    "lang": self.lang
+                }))
+                return True  # NTR handled it by delegating — no more waiting on the pipeline
             else:
                 self.speak_dialog("no_memory_found")
                 return True
@@ -835,7 +843,11 @@ class NearTotalRecall(OVOSSkill):
             self.log.info(f"RESULTS but NO CONTENT For Random Memory")
             if self.fallback_on:
                 self.speak_dialog("checking_artificial_brain")
-                return False  # quietly pass on this one Fallback Friendly
+                self.bus.emit(Message("persona:query", {
+                    "utterance": f"tell me about {raw_title}",
+                    "lang": self.lang
+                }))
+                return True
             else:
                 self.speak_dialog("no_memory_found")
         return False
