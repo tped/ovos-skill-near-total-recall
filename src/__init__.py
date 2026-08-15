@@ -97,13 +97,6 @@ class NearTotalRecall(OVOSSkill):
                 f"MeePi Near Total Recall, version {spoken_version}, initialized",
                 wait=False
             )
-            # Safety check - report gui state
-            if self.gui:
-                # self.gui_mode = True
-                self.speak("GUI detected and enabled.")
-            else:
-                # self.gui_mode = False
-                self.speak("self.gui is NOT set - GUI MODE forced on")
 
         self.log.info(f"Done with Initialize")
 
@@ -757,6 +750,7 @@ class NearTotalRecall(OVOSSkill):
             else:
                 self.log.info(f"RESULTS but NO CONTENT For query: {query}")
                 if self.fallback_on:
+                    self.speak_dialog("checking_artificial_brain")
                     return False  # quietly pass on this one Fallback Friendly
                 else:
                     self.speak_dialog("no_memory_found")
@@ -764,6 +758,7 @@ class NearTotalRecall(OVOSSkill):
         else:
             self.log.info(f"NO RESULTS! For query: {query}")
             if self.fallback_on:
+                self.speak_dialog("checking_artificial_brain")
                 return False  # quietly pass on this one Fallback Friendly
             else:
                 self.speak_dialog("no_memory_found")
@@ -834,6 +829,7 @@ class NearTotalRecall(OVOSSkill):
         else:
             self.log.info(f"RESULTS but NO CONTENT For Random Memory")
             if self.fallback_on:
+                self.speak_dialog("checking_artificial_brain")
                 return False  # quietly pass on this one Fallback Friendly
             else:
                 self.speak_dialog("no_memory_found")
