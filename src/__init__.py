@@ -89,6 +89,13 @@ class NearTotalRecall(OVOSSkill):
 
         self.load_databanks()
 
+        # Safety check - report gui state
+        if self.log_level.upper() != "INFO":
+            if self.gui:
+                self.speak("NTR's GUI detected and enabled.")
+        else:
+            self.speak("NTR's self.gui is NOT currently set")
+
         # Speak state off fallback if log_level != INFO
         if self.log_level.upper() != "INFO":
             if self.fallback_on:
