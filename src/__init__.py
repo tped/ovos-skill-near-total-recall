@@ -17,6 +17,8 @@ from sentence_transformers import SentenceTransformer
 from collections import Counter
 from sklearn.metrics.pairwise import cosine_similarity
 from rapidfuzz import fuzz
+from ovos_yes_no_solver import YesNoSolver
+from typing import Optional
 
 from .version import (
     VERSION_MAJOR,
@@ -227,6 +229,22 @@ class NearTotalRecall(OVOSSkill):
         # Cleanup whitespace
         return re.sub(r'\s+', ' ', result).strip()
 
+    def ask_yesno_bounded(self, prompt: str, data: dict = None, num_retries: int = 1) -> Optional[str]:
+        """Like OVOSSkill.ask_yesno, but with a hard retry ceiling.
+        get_response()'s num_retries defaults to -1, which disables the
+        stop-check entirely (see _real_wait_response) and can hang the
+        session indefinitely. Always pass an explicit num_retries here.
+        TPed was here - Sep 2026, after the 19-minute river cruise incident."""
+        resp = self.get_response(dialog=prompt, data=data, num_retries=num_retries)
+        if not resp:
+            return None
+        answer = YesNoSolver().match_yes_or_no(resp, lang=self.lang)
+        if answer is True:
+            return "yes"
+        elif answer is False:
+            return "no"
+        return resp
+
     def _map_user_query_to_era(self, query):
         """Translates natural language queries into MeePi Era categories."""
         query = query.lower()
@@ -434,11 +452,6 @@ class NearTotalRecall(OVOSSkill):
         # We CAN remember!
         memory = memory_row[0]
 
-        # Use memory's TTS time, fallback to 20 if missing
-        # De-implemented
-        #tts_time = memory.get("tts_time_seconds", 20)
-        #hold_time = math.ceil(tts_time + 1)  # round UP, add 1s cushion
-
         # Extract details
         description = memory['Memory_Description']
         is_long = memory.get("is_long_story", False)
@@ -446,15 +459,14 @@ class NearTotalRecall(OVOSSkill):
 
         # Warn the user and offer summary if available
         if is_long:
-            response = self.get_response("long_story_warning") or "" # Ask user for choice
-            if "full" in response.lower() or "fall" in response.lower() or "all" in response.lower():
+            give_full = self.ask_yesno_bounded("long_story_warning", num_retries=1)
+            if give_full == "yes":
                 return description  # Explicit full request
-            elif response and "summary" in response.lower() and has_summary:
-                return memory["Memory_Summary"]  # Return summary
             elif has_summary:
                 return memory["Memory_Summary"]  # Return summary
         # Default if user gives no usable response - should be short
         return description  # Default to full memory
+
 
     def send_visual_recall_request(self, memory_dict):
         """
@@ -522,7 +534,8 @@ class NearTotalRecall(OVOSSkill):
                 continue
 
             # Skip any file that is a duplicate of the cover (The Plymouth Fix)
-            if cover_path and filecmp.cmp(file_path, cover_path, shallow=True):
+            # Shallow=False added to force byte-for-bye compare
+            if cover_path and filecmp.cmp(file_path, cover_path, shallow=False):
                 self.log.info(f"NTR: Ignoring {f} - it is a duplicate of the cover image.")
                 continue
 
@@ -553,7 +566,9 @@ class NearTotalRecall(OVOSSkill):
         self.log.info("Asking user for visual confirmation with quantifier variable.")
 
         # Pass the quantifier text to the visual_media_prompt.dialog file
-        response = self.get_response(
+        # NOTE: ask_yesno_bounded enforces a real num_retries ceiling and uses
+        # YesNoSolver for fuzzy yes/no matching - TPed was here, Sep 2026
+        give_visuals = self.ask_yesno_bounded(
             "visual_media_prompt",
             data={"quantifier": quantifier_text},
             num_retries=1
@@ -561,7 +576,7 @@ class NearTotalRecall(OVOSSkill):
 
         # --- 4. SEND SIGNAL OR FINISH ---
 
-        if response and self.voc_match(response, "yes"):
+        if give_visuals == "yes":
             self.log.info(f"User confirmed: Sending visual recall request for {media_count} items.")
             # --- BRIDGE THE GAP ---
             # Re-show the current image to prevent the OVOS logo from flashing
