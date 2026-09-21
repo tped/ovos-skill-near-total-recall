@@ -24,8 +24,26 @@ from .version import (
     VERSION_MAJOR,
     VERSION_MINOR,
     VERSION_BUILD,
-    VERSION_ALPHA
+    VERSION_ALPHA,
+    VERSION_TAG
 )
+
+# Some global Term Corrections, so I have them in one place
+TERM_CORRECTIONS = {
+    "meepy": "meepi",
+    "meepie": "meepi",
+    "mipi": "meepi",
+    "me pie": "meepi",
+    "meep e": "meepi",
+    "meat pie": "meepi",
+    "meatpie": "meepi",
+}
+
+# Spoken-reply vocabulary for "full memory or a summary?" (see _classify_length_choice).
+# Add mishearings as they show up in the log.
+FULL_WORDS = {"full", "whole", "entire", "everything", "all", "long", "complete"}
+SUMMARY_WORDS = {"summary", "summarize", "short", "shorter", "brief", "quick", "highlights"}
+NEAR_MISS_THRESHOLD = 75  # rapidfuzz ratio (0-100): "fall"/"fool" -> "full", "summery" -> "summary"
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
@@ -95,8 +113,8 @@ class NearTotalRecall(OVOSSkill):
         if self.log_level.upper() != "INFO":
             if self.gui:
                 self.speak("NTR's GUI detected and enabled.")
-        else:
-            self.speak("NTR's self.gui is NOT currently set")
+            else:
+                self.speak("NTR's self.gui is NOT currently set")
 
         # Speak state off fallback if log_level != INFO
         if self.log_level.upper() != "INFO":
@@ -107,8 +125,9 @@ class NearTotalRecall(OVOSSkill):
         if self.log_level.upper() != "INFO":
             ver = self.skill_version()
             spoken_version = ver.replace("a", " alpha ")
+            tag = f", {VERSION_TAG}" if VERSION_TAG else ""
             self.speak(
-                f"MeePi Near Total Recall, version {spoken_version}, initialized",
+                f"MeePi Near Total Recall, version {spoken_version}{tag}, initialized",
                 wait=False
             )
 
@@ -245,6 +264,24 @@ class NearTotalRecall(OVOSSkill):
             return "no"
         return resp
 
+    def ask_full_or_summary(self) -> Optional[str]:
+        """Ask whether the user wants the full memory or a summary.
+        Returns 'full', 'summary', or None (silence, cancel, or still unclear
+        after one re-ask). Not a yes/no question, so no ask_yesno_bounded."""
+
+        def usable(utt: str) -> bool:
+            choice = self._classify_length_choice(utt)
+            self.log.info(f"NTR: full/summary reply {utt!r} -> {choice}")
+            return choice is not None
+
+        resp = self.get_response(
+            dialog="long_story_warning",
+            validator=usable,
+            on_fail="long_story_reprompt",
+            num_retries=1,
+        )
+        return self._classify_length_choice(resp) if resp else None
+
     def _map_user_query_to_era(self, query):
         """Translates natural language queries into MeePi Era categories."""
         query = query.lower()
@@ -317,10 +354,13 @@ class NearTotalRecall(OVOSSkill):
 
     @staticmethod
     def prep_for_math(text):
-        """Normalize text for keyword scoring: lowercase, expand hyphens, strip punctuation."""
+        """Normalize text for keyword scoring: lowercase, correct known STT
+        mishearings, expand hyphens, strip punctuation."""
         if not isinstance(text, str): return ""
         text = text.lower()
         text = text.replace("pedersen", "pedersen peterson peederson")
+        for wrong, right in TERM_CORRECTIONS.items():
+            text = text.replace(wrong, right)
         text = text.replace("-", " ")  # hyphens become spaces BEFORE stripping
         text = re.sub(r"[^a-z0-9\s]", "", text)
         return text
@@ -329,9 +369,25 @@ class NearTotalRecall(OVOSSkill):
     def scrub_query(q):
         """Strip intent carrier phrases from the raw query before scoring."""
         q = q.lower()
-        stops = ["tell me about", "do you remember", "what is", "recall", "the"]
+        stops = ["tell me about", "do you remember", "what is", "recall", "the", "your"]
         for word in stops: q = q.replace(word, "")
         return NearTotalRecall.prep_for_math(q).strip()
+
+    @staticmethod
+    def _classify_length_choice(utt: str) -> Optional[str]:
+        """Interpret a spoken reply to 'full memory or a summary?'.
+        Returns 'full', 'summary', or None if the reply is unclear."""
+        tokens = re.findall(r"[a-z']+", (utt or "").lower())
+
+        def hit(words, anchor):
+            # exact vocab word, or a near-miss of the anchor word
+            return any(t in words or fuzz.ratio(t, anchor) >= NEAR_MISS_THRESHOLD for t in tokens)
+
+        if hit(SUMMARY_WORDS, "summary"):
+            return "summary"  # summary wins if both appear ("not the full one, the summary")
+        if hit(FULL_WORDS, "full"):
+            return "full"
+        return None
 
     def find_closest_memory(self, query):
         """
@@ -457,16 +513,15 @@ class NearTotalRecall(OVOSSkill):
         is_long = memory.get("is_long_story", False)
         has_summary = bool(memory.get("Memory_Summary"))
 
-        # Warn the user and offer summary if available
-        if is_long:
-            give_full = self.ask_yesno_bounded("long_story_warning", num_retries=1)
-            if give_full == "yes":
-                return description  # Explicit full request
-            elif has_summary:
-                return memory["Memory_Summary"]  # Return summary
-        # Default if user gives no usable response - should be short
-        return description  # Default to full memory
+        # Long memory with a summary on hand: let the user choose.
+        # No summary means nothing to offer, so don't ask.
+        if is_long and has_summary:
+            choice = self.ask_full_or_summary()
+            self.log.info(f"NTR: long-story choice = {choice}")
+            if choice != "full":
+                return memory["Memory_Summary"]  # summary, unclear, or silence
 
+        return description
 
     def send_visual_recall_request(self, memory_dict):
         """
