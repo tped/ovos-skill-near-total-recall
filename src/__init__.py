@@ -39,6 +39,10 @@ TERM_CORRECTIONS = {
     "meatpie": "meepi",
 }
 
+# Spoken-reply vocabulary for simple yes/no prompts (see _classify_yesno).
+YES_WORDS = {"yes", "yeah", "yep", "yup", "sure", "ok", "okay", "please",
+             "absolutely", "definitely", "go", "show"}
+NO_WORDS = {"no", "nope", "nah", "not", "never", "skip", "later", "stop"}
 # Spoken-reply vocabulary for "full memory or a summary?" (see _classify_length_choice).
 # Add mishearings as they show up in the log.
 FULL_WORDS = {"full", "whole", "entire", "everything", "all", "long", "complete"}
@@ -282,6 +286,25 @@ class NearTotalRecall(OVOSSkill):
         )
         return self._classify_length_choice(resp) if resp else None
 
+    def ask_yesno_hard(self, dialog: str, data: dict = None, reprompt_dialog: str = None) -> Optional[str]:
+        """Hand-coded yes/no ask: word-set matching instead of YesNoSolver,
+        with a hard retry ceiling. Returns 'yes', 'no', or None (silence,
+        cancel, or still unclear after one re-ask)."""
+
+        def usable(utt: str) -> bool:
+            choice = self._classify_yesno(utt)
+            self.log.info(f"NTR: yesno reply {utt!r} -> {choice}")
+            return choice is not None
+
+        resp = self.get_response(
+            dialog=dialog,
+            data=data,
+            validator=usable,
+            on_fail=reprompt_dialog,
+            num_retries=1,
+        )
+        return self._classify_yesno(resp) if resp else None
+
     def _map_user_query_to_era(self, query):
         """Translates natural language queries into MeePi Era categories."""
         query = query.lower()
@@ -387,6 +410,23 @@ class NearTotalRecall(OVOSSkill):
             return "summary"  # summary wins if both appear ("not the full one, the summary")
         if hit(FULL_WORDS, "full"):
             return "full"
+        return None
+
+    @staticmethod
+    def _classify_yesno(utt: str) -> Optional[str]:
+        """Interpret a spoken reply to a yes/no prompt.
+        Returns 'yes', 'no', or None if the reply is unclear."""
+        tokens = re.findall(r"[a-z']+", (utt or "").lower())
+
+        def hit(words, anchor):
+            return any(t in words or fuzz.ratio(t, anchor) >= NEAR_MISS_THRESHOLD for t in tokens)
+
+        # "no" wins on a mixed reply ("no, actually go ahead" is ambiguous either way,
+        # but declining is the safer default for an optional extra like this)
+        if hit(NO_WORDS, "no"):
+            return "no"
+        if hit(YES_WORDS, "yes"):
+            return "yes"
         return None
 
     def find_closest_memory(self, query):
@@ -621,12 +661,16 @@ class NearTotalRecall(OVOSSkill):
         self.log.info("Asking user for visual confirmation with quantifier variable.")
 
         # Pass the quantifier text to the visual_media_prompt.dialog file
-        # NOTE: ask_yesno_bounded enforces a real num_retries ceiling and uses
-        # YesNoSolver for fuzzy yes/no matching - TPed was here, Sep 2026
-        give_visuals = self.ask_yesno_bounded(
+        # NOTE: ask_yesno_hard caps get_response's retries at num_retries=1
+        # (its default of -1 disables the stop-check and can hang the session —
+        # see the river cruise incident, Sep 2026) and re-asks once via
+        # visual_media_reprompt.dialog if the reply isn't a clear yes/no,
+        # using hand-coded word-set matching (_classify_yesno) rather than
+        # YesNoSolver. - TPed was here, Sep 2026
+        give_visuals = self.ask_yesno_hard(
             "visual_media_prompt",
             data={"quantifier": quantifier_text},
-            num_retries=1
+            reprompt_dialog="visual_media_reprompt",
         )
 
         # --- 4. SEND SIGNAL OR FINISH ---
