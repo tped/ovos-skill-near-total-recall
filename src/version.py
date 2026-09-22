@@ -1,5 +1,5 @@
 VERSION_MAJOR = 1
 VERSION_MINOR = 4
-VERSION_BUILD = 1
+VERSION_BUILD = 3
 VERSION_ALPHA = 1
-VERSION_TAG = "Yes No My Way!"  # short spoken label for the current change; "" for none
+VERSION_TAG = "Yes No My Way! Attempt 2"  # short spoken label for the current change; "" for none
