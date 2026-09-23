@@ -2,7 +2,6 @@ ovos-utils
 ovos-bus-client
 ovos-workshop
 ovos-plugin-manager
-ovos-solver-yes-no-plugin
 # Your requirements here
 numpy
 Sentence-Transformers

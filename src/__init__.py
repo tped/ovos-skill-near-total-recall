@@ -17,7 +17,6 @@ from sentence_transformers import SentenceTransformer
 from collections import Counter
 from sklearn.metrics.pairwise import cosine_similarity
 from rapidfuzz import fuzz
-from ovos_yes_no_solver import YesNoSolver
 from typing import Optional
 
 from .version import (
@@ -251,22 +250,6 @@ class NearTotalRecall(OVOSSkill):
 
         # Cleanup whitespace
         return re.sub(r'\s+', ' ', result).strip()
-
-    def ask_yesno_bounded(self, prompt: str, data: dict = None, num_retries: int = 1) -> Optional[str]:
-        """Like OVOSSkill.ask_yesno, but with a hard retry ceiling.
-        get_response()'s num_retries defaults to -1, which disables the
-        stop-check entirely (see _real_wait_response) and can hang the
-        session indefinitely. Always pass an explicit num_retries here.
-        TPed was here - Sep 2026, after the 19-minute river cruise incident."""
-        resp = self.get_response(dialog=prompt, data=data, num_retries=num_retries)
-        if not resp:
-            return None
-        answer = YesNoSolver().match_yes_or_no(resp, lang=self.lang)
-        if answer is True:
-            return "yes"
-        elif answer is False:
-            return "no"
-        return resp
 
     def ask_full_or_summary(self) -> Optional[str]:
         """Ask whether the user wants the full memory or a summary.
