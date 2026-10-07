@@ -124,7 +124,8 @@ class NearTotalRecall(OVOSSkill):
             if self.fallback_on:
                 self.speak(f"MeePi's Artificial Brain enabled")
 
-        # Speak version if log_level != INFO
+        # Speak and log version if log_level != INFO
+        self.log.info(f"Near Total Recall Skill version={self.skill_version()} tag='{VERSION_TAG}'")
         if self.log_level.upper() != "INFO":
             ver = self.skill_version()
             spoken_version = ver.replace("a", " alpha ")
@@ -1014,6 +1015,14 @@ class NearTotalRecall(OVOSSkill):
         # THIS IS A KLUDGE ... catch strays
         # MeePI Says NOTHING, Knows NOTHING, Does NOTHING
         # Just don't EVER thank MeePI
+
+    #----------------------
+    #  HANDLE STOP(S)
+    #----------------------
+
+    def can_stop(self, _message: Message) -> bool:
+        """Claim a 'stop' only while MeePi is actually reciting a memory."""
+        return bool(self.is_reciting)
 
     def stop(self):
         """ Action to take when "stop" is requested by the user.
