@@ -1022,7 +1022,9 @@ class NearTotalRecall(OVOSSkill):
 
     def can_stop(self, _message: Message) -> bool:
         """Claim a 'stop' only while MeePi is actually reciting a memory."""
-        return bool(self.is_reciting)
+        busy = bool(self.is_reciting)
+        self.log.debug(f"NTR: can_stop -> {busy}")
+        return busy
 
     def stop(self):
         """ Action to take when "stop" is requested by the user.
