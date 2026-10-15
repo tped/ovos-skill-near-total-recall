@@ -633,60 +633,23 @@ class NearTotalRecall(OVOSSkill):
                 self.gui.release()  # GUI Release
             return
 
-        # Determine the quantifier for the user dialog
-        if media_count == 1:
-            quantifier_text = "a single related image"
-        elif media_count <= 4:
-            quantifier_text = "a few images"
-        else:
-            quantifier_text = "a lot of images"
+        # --- 2. HAND OFF ---
+        # VR owns the "what would you like to see or hear?" question now, since it
+        # knows the media types. NTR only decides whether there is anything to offer.
+        self.log.info(f"Visual recall: {media_count} extra media file(s); handing off to VR.")
 
-        # --- 3. ASK FOR USER CONFIRMATION ---
-        self.log.info("Asking user for visual confirmation with quantifier variable.")
+        # Bridge the gap: hold the cover while VR loads, to avoid the OVOS logo flash
+        if self.gui:
+            image_to_hold = cover_path if cover_path else self.image_path
+            self.gui.show_image(image_to_hold, fill='PreserveAspectFit', override_idle=20)
 
-        # Pass the quantifier text to the visual_media_prompt.dialog file
-        # NOTE: ask_yesno_hard caps get_response's retries at num_retries=1
-        # (its default of -1 disables the stop-check and can hang the session —
-        # see the river cruise incident, Sep 2026) and re-asks once via
-        # visual_media_reprompt.dialog if the reply isn't a clear yes/no,
-        # using hand-coded word-set matching (_classify_yesno) rather than
-        # YesNoSolver. - TPed was here, Sep 2026
-        give_visuals = self.ask_yesno_hard(
-            "visual_media_prompt",
-            data={"quantifier": quantifier_text},
-            reprompt_dialog="visual_media_reprompt",
-        )
-
-        # --- 4. SEND SIGNAL OR FINISH ---
-
-        if give_visuals == "yes":
-            self.log.info(f"User confirmed: Sending visual recall request for {media_count} items.")
-            # --- BRIDGE THE GAP ---
-            # Re-show the current image to prevent the OVOS logo from flashing
-            # while the Visual Recall skill is loading.
-            if self.gui:
-                image_to_hold = cover_path if cover_path else self.image_path
-                self.gui.show_image(image_to_hold, fill='PreserveAspectFit', override_idle=20)
-
-            self.bus.emit(
-                Message(
-                    "visual.recall.display",  # The event registered in the VR skill
-                    data={
-                        "media_path": folder_path,
-                        "title": raw_title
-                    }
-                )
+        self.bus.emit(
+            Message(
+                "visual.recall.display",
+                data={"media_path": folder_path, "title": raw_title}
             )
-
-            # Wait a moment for VR to "pickup" the screen before we exit
-            time.sleep(1.2)
-
-        else:
-            self.log.info("User declined visual recall.")
-            self.speak_dialog("visual_declined")
-            if self.gui:
-                self.gui.release()
-            return
+        )
+        time.sleep(1.2)
 
     @staticmethod
     def _smart_chunk(text, limit):
