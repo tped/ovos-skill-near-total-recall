@@ -83,6 +83,8 @@ class NearTotalRecall(OVOSSkill):
         self.session_results = {}
         self.learning = True
         self.is_reciting = False
+        self.tts_speaking = False
+        self.recital_interrupted = False
 
         """ # Placeholders to stop the warnings
         self.log_level = "INFO"
@@ -109,6 +111,9 @@ class NearTotalRecall(OVOSSkill):
         # self.settings is a jsondb, which extends the dict class and adds helpers like merge
         self.settings.merge(DEFAULT_SETTINGS, new_only=True)
         self.log_level = self.settings.get("log_level", "INFO")
+
+        self.add_event("recognizer_loop:audio_output_start", self._on_audio_start)
+        self.add_event("recognizer_loop:audio_output_end", self._on_audio_end)
 
         self.load_databanks()
 
@@ -229,6 +234,12 @@ class NearTotalRecall(OVOSSkill):
         This will reflect live changes to settings.json files (local or from backend)
         """
         return self.settings.get("my_setting", "default_value")
+
+    def _on_audio_start(self, _message):
+        self.tts_speaking = True
+
+    def _on_audio_end(self, _message):
+        self.tts_speaking = False
 
     @staticmethod
     def _flip_pronouns(text):
@@ -552,6 +563,12 @@ class NearTotalRecall(OVOSSkill):
         Calculates folder path, counts all media types, asks user for confirmation,
         and sends Messagebus request to Visual Recall skill if confirmed.
         """
+        if self.recital_interrupted:
+            self.log.info("NTR: recital interrupted by user; skipping visual recall hand-off.")
+            if self.gui:
+                self.gui.release()
+            return
+
         if not self.media_available:
             self.log.info("Visual recall skipped: Media folder not available.")
             if self.gui:
@@ -680,15 +697,30 @@ class NearTotalRecall(OVOSSkill):
         return chunks
 
     def speak_simple(self, dialog_file: str, text: str, image_path: str = None, hold_per_refresh: int = 30):
-        """Simple speak - let OVOS handle the TTS queue directly."""
+        """Speak a memory and stay 'reciting' until the audio actually ends."""
         if not text:
             return
 
+        self.recital_interrupted = False
         self.is_reciting = True
         try:
             if image_path and self.gui:
                 self.gui.show_image(image_path, fill='PreserveAspectFit', override_idle=hold_per_refresh)
             self.speak_dialog(dialog_file, {"memory": text}, wait=True)
+
+            # wait=True gives up after 15 seconds, but a full memory can talk for minutes.
+            # Stay "reciting" until audio output has been quiet for 1.5 s (or stop() clears
+            # the flag, or a safety deadline passes) so "stop" can still find us.
+            deadline = time.monotonic() + max(30, len(text.split()) / 2.0 + 20)
+            quiet_since = None
+            while self.is_reciting and time.monotonic() < deadline:
+                if self.tts_speaking:
+                    quiet_since = None
+                elif quiet_since is None:
+                    quiet_since = time.monotonic()
+                elif time.monotonic() - quiet_since > 1.5:
+                    break
+                time.sleep(0.25)
         finally:
             self.is_reciting = False
 
@@ -1003,6 +1035,7 @@ class NearTotalRecall(OVOSSkill):
 
         if self.is_reciting:
             self.is_reciting = False
+            self.recital_interrupted = True
             self.bus.emit(Message("mycroft.audio.speech.stop"))
             self.speak_dialog("stopped_talking")  # Feedback
             self.log.info("MeePi was interrupted by user.")

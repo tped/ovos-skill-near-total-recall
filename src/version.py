@@ -1,5 +1,5 @@
 VERSION_MAJOR = 1
 VERSION_MINOR = 4
-VERSION_BUILD = 7
+VERSION_BUILD = 8
 VERSION_ALPHA = 1
-VERSION_TAG = "Version 1.4.7 Let Visual Recall Count Media!"  # short spoken label for the current change; "" for none
+VERSION_TAG = "Version 1.4.8 Fix speak_simple to allow STOP!"  # short spoken label for the current change; "" for none
