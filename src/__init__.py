@@ -727,9 +727,7 @@ class NearTotalRecall(OVOSSkill):
             for i, chunk in enumerate(chunks):
                 if not self._still_reciting():
                     break
-                # Heartbeat per chunk: keeps the converse shield active and the
-                # cover image from timing out on long recitals.
-                self.activate()
+                # Refresh the cover image hold each chunk.
                 if image_path and self.gui:
                     self.gui.show_image(image_path, fill='PreserveAspectFit',
                                         override_idle=hold_per_refresh)
