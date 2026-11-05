@@ -47,6 +47,15 @@ NO_WORDS = {"no", "nope", "nah", "not", "never", "skip", "later", "stop"}
 FULL_WORDS = {"full", "whole", "entire", "everything", "all", "long", "complete"}
 SUMMARY_WORDS = {"summary", "summarize", "short", "shorter", "brief", "quick", "highlights"}
 NEAR_MISS_THRESHOLD = 75  # rapidfuzz ratio (0-100): "fall"/"fool" -> "full", "summery" -> "summary"
+# Tweaks to adjust chunking of spoken text - smooth recital
+CHUNK_TARGET_WORDS = 30    # ~8-9 s of audio, safely under wait=True's 15 s limit
+CHUNK_MAX_WORDS = 45       # a single sentence longer than this gets split at commas
+CHUNK_GAP_SECONDS = 0.2    # extra pause between chunks (synthesis adds ~1 s on top)
+
+# Split only where the next sentence starts with a capital, quote, bracket or digit,
+# so an ellipsis like "a good... secure job" is not broken in the middle.
+_SENTENCE_SPLIT = re.compile(r'(?<=[.!?])\s+(?=["\'(\[A-Z0-9])')
+_CLAUSE_SPLIT = re.compile(r'(?<=[,;:])\s+')
 
 # NTR data and tuning parameters in <NTR_Skill>/settings.json
 DEFAULT_SETTINGS = {
