@@ -671,31 +671,75 @@ class NearTotalRecall(OVOSSkill):
         )
         time.sleep(1.2)
 
-    def speak_simple(self, dialog_file: str, text: str, image_path: str = None, hold_per_refresh: int = 30):
-        """Speak a memory and stay 'reciting' until the audio actually ends."""
+    @staticmethod
+    def _chunk_text(text: str, target: int = CHUNK_TARGET_WORDS,
+                    hard_max: int = CHUNK_MAX_WORDS) -> list:
+        """Group sentences into chunks of roughly `target` words."""
+        text = re.sub(r'\s+', ' ', text).strip()
+        pieces = []
+        for sentence in _SENTENCE_SPLIT.split(text):
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(sentence.split()) <= hard_max:
+                pieces.append(sentence)
+            else:  # very long sentence: break at commas / semicolons
+                pieces.extend(p.strip() for p in _CLAUSE_SPLIT.split(sentence) if p.strip())
+
+        chunks, current = [], []
+        for piece in pieces:
+            if current and len(" ".join(current + [piece]).split()) > target:
+                chunks.append(" ".join(current))
+                current = []
+            current.append(piece)
+        if current:
+            chunks.append(" ".join(current))
+        return chunks
+
+    def _still_reciting(self) -> bool:
+        return self.is_reciting and not self.recital_interrupted
+
+    def _pause(self, seconds: float) -> bool:
+        """Sleep in small steps; return False if stop arrived meanwhile."""
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            if not self._still_reciting():
+                return False
+            time.sleep(0.05)
+        return True
+
+    def _wait_for_tts_end(self, timeout: float = 60):
+        """wait=True gives up after 15 s; if a chunk is still talking, ride it out."""
+        deadline = time.monotonic() + timeout
+        while self.tts_speaking and self._still_reciting() and time.monotonic() < deadline:
+            time.sleep(0.1)
+
+    def speak_simple(self, dialog_file: str, text: str, image_path: str = None,
+                     hold_per_refresh: int = 30):
+        """Speak a memory a few sentences at a time so 'stop' can land between chunks."""
         if not text:
             return
 
         self.recital_interrupted = False
         self.is_reciting = True
         try:
-            if image_path and self.gui:
-                self.gui.show_image(image_path, fill='PreserveAspectFit', override_idle=hold_per_refresh)
-            self.speak_dialog(dialog_file, {"memory": text}, wait=True)
-
-            # wait=True gives up after 15 seconds, but a full memory can talk for minutes.
-            # Stay "reciting" until audio output has been quiet for 1.5 s (or stop() clears
-            # the flag, or a safety deadline passes) so "stop" can still find us.
-            deadline = time.monotonic() + max(30, len(text.split()) / 2.0 + 20)
-            quiet_since = None
-            while self.is_reciting and time.monotonic() < deadline:
-                if self.tts_speaking:
-                    quiet_since = None
-                elif quiet_since is None:
-                    quiet_since = time.monotonic()
-                elif time.monotonic() - quiet_since > 1.5:
+            chunks = self._chunk_text(text)
+            for i, chunk in enumerate(chunks):
+                if not self._still_reciting():
                     break
-                time.sleep(0.25)
+                # Heartbeat per chunk: keeps the converse shield active and the
+                # cover image from timing out on long recitals.
+                self.activate()
+                if image_path and self.gui:
+                    self.gui.show_image(image_path, fill='PreserveAspectFit',
+                                        override_idle=hold_per_refresh)
+                if i == 0:  # the lead-in dialog wraps the first chunk only
+                    self.speak_dialog(dialog_file, {"memory": chunk}, wait=True)
+                else:
+                    self.speak(chunk, wait=True)
+                self._wait_for_tts_end()
+                if i < len(chunks) - 1 and not self._pause(CHUNK_GAP_SECONDS):
+                    break
         finally:
             self.is_reciting = False
 
