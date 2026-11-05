@@ -71,8 +71,6 @@ DEFAULT_SETTINGS = {
     "top_n": 5,  # Number of top results to return
     "similarity_threshold": 0.32,  # Minimum similarity score to consider a match
     "model_name": "all-MiniLM-L6-v2",  # Embedding model
-    "chunk_pause_seconds": 0.2,  # Paragraph chunking pause (seconds)
-    "max_tts_chunk_size": 300,  # Max Characters per TTS call
 
     # Hybrid search weights (must sum to 1.0)
     # Semantic: embedding cosine similarity (good for concepts, context)
@@ -107,8 +105,6 @@ class NearTotalRecall(OVOSSkill):
         self.top_n: int = 3                         # PyCharm: "This is always a number"
         self.similarity_threshold: float = 0.5      # PyCharm: "This is always a number"
         self.model_name = ""
-        self.chunk_pause: float = 0.2               # PyCharm: "This is always a number"
-        self.max_chunk_size = 250
         self.embeddings: np.ndarray | None = None   # PyCharm: "This is a numpy array"
         self.memory_data: list[dict] = []           # PyCharm: "Items inside are dictionaries"
         self.model: SentenceTransformer | None = None
@@ -169,8 +165,6 @@ class NearTotalRecall(OVOSSkill):
         self.top_n = self.settings.get("top_n", 3)
         self.similarity_threshold = self.settings.get("similarity_threshold", 0.5)
         self.model_name = self.settings.get("model_name") or ""
-        self.chunk_pause = self.settings.get("chunk_pause_seconds", 0.2)
-        self.max_chunk_size = self.settings.get("max_tts_chunk_size", 250)
         self.semantic_weight = self.settings.get("semantic_weight", 0.60)
         self.keyword_weight = self.settings.get("keyword_weight", 0.40)
 
@@ -677,34 +671,6 @@ class NearTotalRecall(OVOSSkill):
         )
         time.sleep(1.2)
 
-    @staticmethod
-    def _smart_chunk(text, limit):
-        """
-        Splits text into chunks of roughly 'limit' characters,
-        but avoids breaking sentences in the middle.
-        """
-        # Split by sentence endings (. ? ! followed by whitespace)
-        sentences = re.split(r'(?<=[.?!])\s+', text)
-
-        chunks = []
-        current_chunk = ""
-
-        for s in sentences:
-            # If adding this sentence stays under the limit, add it
-            if len(current_chunk) + len(s) < limit:
-                current_chunk += s + " "
-            else:
-                # Limit reached: push current chunk and start a new one
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = s + " "
-
-        # Don't forget the leftovers
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-
-        return chunks
-
     def speak_simple(self, dialog_file: str, text: str, image_path: str = None, hold_per_refresh: int = 30):
         """Speak a memory and stay 'reciting' until the audio actually ends."""
         if not text:
@@ -730,68 +696,6 @@ class NearTotalRecall(OVOSSkill):
                 elif time.monotonic() - quiet_since > 1.5:
                     break
                 time.sleep(0.25)
-        finally:
-            self.is_reciting = False
-
-    def speak_buffered(self, dialog_file: str, text: str, image_path: str = None, hold_per_refresh: int = 30):
-        if not text:
-            return
-
-        # pause = self.chunk_pause
-        self.is_reciting = True
-
-        # Normalize line breaks to handle paragraphs
-        normalized = text.replace("\r\n", "\n").strip()
-        paragraphs = [p.strip() for p in re.split(r"\n\s*\n", normalized) if p.strip()]
-
-        try:
-            for i, p in enumerate(paragraphs):
-                if not self.is_reciting:
-                    break
-
-                # HEARTBEAT: Keep skill active so Shield stays up
-                self.activate()
-
-                # Refresh image hold timer each paragraph
-                if image_path and self.gui:
-                    self.gui.show_image(image_path, fill='PreserveAspectFit', override_idle=hold_per_refresh)
-
-                # --- LOGIC START ---
-                text_to_chunk = p
-
-                # 1. OPTIMIZATION: If it's the very first paragraph,
-                # peel off the first sentence for immediate playback.
-                if i == 0 and len(p) > 60:
-                    match = re.search(r'(?<=[.?!])\s+', p)
-                    if match:
-                        first_sentence = p[:match.start()]
-                        text_to_chunk = p[match.end():]  # The rest gets chunked below
-
-                        # SPEAK FIRST SENTENCE IMMEDIATELY
-                        self.speak_dialog(dialog_file, {"memory": first_sentence}, wait=False)
-
-                # 2. Smart Chunk the remaining text
-                # This prevents the "Loading..." gap between sentence 1 and 2
-                chunks = self._smart_chunk(text_to_chunk, self.max_chunk_size)
-
-                for j, chunk in enumerate(chunks):
-                    if not self.is_reciting:
-                        break
-
-                    # Determine if we should wait.
-                    # We only wait on the VERY LAST chunk of a paragraph
-                    # to respect your 'chunk_pause' (paragraph break).
-                    # is_last_chunk = (i == len(paragraphs) - 1) and (j == len(chunks) - 1)
-                    is_end_of_paragraph = (j == len(chunks) - 1)
-
-                    # Speak the chunk.
-                    # By setting wait=False for intermediate chunks, OVOS queues them.
-                    self.speak_dialog("recite_chunk", {"memory": chunk}, wait=is_end_of_paragraph)
-
-                # Paragraph Pause - only if not the last paragraph
-                if i < len(paragraphs) - 1:
-                    time.sleep(self.chunk_pause)
-
         finally:
             self.is_reciting = False
 
@@ -821,7 +725,6 @@ class NearTotalRecall(OVOSSkill):
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 cover = self.display_cover_image(memory_dict)
                 self.speak_simple(dialog_file, memory_content, image_path=cover)
-                # self.speak_buffered(dialog_file, memory_content, image_path=cover)
                 # NEW: Hand off to Visual Recall (handles GUI release internally)
                 self.send_visual_recall_request(memory_dict)
                 return True  # Fallback Friendly 3
@@ -854,7 +757,6 @@ class NearTotalRecall(OVOSSkill):
             if memory_content:
                 dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
                 cover = self.display_cover_image(memory_dict)
-                # self.speak_buffered(dialog_file, memory_content, image_path=cover)
                 self.speak_simple(dialog_file, memory_content, image_path=cover)
                 # Release GUI only when done with intent
                 # NEW: Hand off to Visual Recall (handles GUI release internally)
@@ -942,7 +844,6 @@ class NearTotalRecall(OVOSSkill):
         if memory_content:
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             cover = self.display_cover_image(memory)
-            # self.speak_buffered(dialog_file, memory_content, image_path=cover)
             self.speak_simple(dialog_file, memory_content, image_path=cover)
             
             # Hand off to Visual Recall
@@ -1006,7 +907,6 @@ class NearTotalRecall(OVOSSkill):
         if memory_content:
             dialog_file = "recite_memory" if len(memory_content.split()) > 20 else "recite_summary"
             cover = self.display_cover_image(memory)
-            # self.speak_buffered(dialog_file, memory_content, image_path=cover)
             self.speak_simple(dialog_file, memory_content, image_path=cover)
             self.send_visual_recall_request(memory)
             return True
