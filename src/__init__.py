@@ -29,6 +29,7 @@ from .version import (
 
 # Some global Term Corrections, so I have them in one place
 TERM_CORRECTIONS = {
+    # STT mishearings -> canonical
     "meepy": "meepi",
     "meepie": "meepi",
     "mipi": "meepi",
@@ -36,7 +37,14 @@ TERM_CORRECTIONS = {
     "meep e": "meepi",
     "meat pie": "meepi",
     "meatpie": "meepi",
+    "petersen": "pedersen",
+    "peterson": "pedersen",
+    "pederson": "pedersen",
+    # NOTE: "petersen" deliberately omitted: real name in the memory bank
 }
+_TERM_RE = re.compile(
+    r"\b(" + "|".join(re.escape(k) for k in sorted(TERM_CORRECTIONS, key=len, reverse=True)) + r")\b"
+)
 
 # Spoken-reply vocabulary for simple yes/no prompts (see _classify_yesno).
 YES_WORDS = {"yes", "yeah", "yep", "yup", "sure", "ok", "okay", "please",
@@ -374,14 +382,17 @@ class NearTotalRecall(OVOSSkill):
         return False
 
     @staticmethod
+    def apply_term_corrections(text):
+        """Single entry point for STT/term corrections (whole words only)."""
+        return _TERM_RE.sub(lambda m: TERM_CORRECTIONS[m.group(1)], text)
+
+    @staticmethod
     def prep_for_math(text):
         """Normalize text for keyword scoring: lowercase, correct known STT
         mishearings, expand hyphens, strip punctuation."""
         if not isinstance(text, str): return ""
         text = text.lower()
-        text = text.replace("pedersen", "pedersen peterson peederson")
-        for wrong, right in TERM_CORRECTIONS.items():
-            text = text.replace(wrong, right)
+        text = NearTotalRecall.apply_term_corrections(text)
         text = text.replace("-", " ")  # hyphens become spaces BEFORE stripping
         text = re.sub(r"[^a-z0-9\s]", "", text)
         return text
@@ -439,6 +450,7 @@ class NearTotalRecall(OVOSSkill):
         self.log.info(f"🔍 Hybrid search for query: '{query}'")
 
         clean_q = self.scrub_query(query)
+        self.log.info(f"Query after term corrections: {clean_q}")
         q_vec = self.model.encode([clean_q])
         q_tokens = clean_q.split()
 
@@ -727,7 +739,7 @@ class NearTotalRecall(OVOSSkill):
             for i, chunk in enumerate(chunks):
                 if not self._still_reciting():
                     break
-                # Refresh the cover image hold each chunk.
+                # Refresh the cover image hold each chunk.sudo
                 if image_path and self.gui:
                     self.gui.show_image(image_path, fill='PreserveAspectFit',
                                         override_idle=hold_per_refresh)
