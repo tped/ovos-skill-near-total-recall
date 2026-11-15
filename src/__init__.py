@@ -621,7 +621,7 @@ class NearTotalRecall(OVOSSkill):
         # Supported media extensions across all types (image, audio, video)
         supported_ext = (
             '.jpg', '.jpeg', '.png', '.gif',  # Images
-            '.mp4', '.mkv', '.avi', '.mov', '.webm',  # Videos
+            '.mp4', '.mkv', '.avi', '.mov', '.webm', 'm4v' # Videos
             '.mp3', '.wav', '.flac', '.m4a', '.aac'  # Audio
         )
 
@@ -739,7 +739,7 @@ class NearTotalRecall(OVOSSkill):
             for i, chunk in enumerate(chunks):
                 if not self._still_reciting():
                     break
-                # Refresh the cover image hold each chunk.sudo
+                # Refresh the cover image hold each chunk
                 if image_path and self.gui:
                     self.gui.show_image(image_path, fill='PreserveAspectFit',
                                         override_idle=hold_per_refresh)
