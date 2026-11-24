@@ -621,7 +621,7 @@ class NearTotalRecall(OVOSSkill):
         # Supported media extensions across all types (image, audio, video)
         supported_ext = (
             '.jpg', '.jpeg', '.png', '.gif',  # Images
-            '.mp4', '.mkv', '.avi', '.mov', '.webm', 'm4v' # Videos
+            '.mp4', '.mkv', '.avi', '.mov', '.webm', '.m4v', # Videos
             '.mp3', '.wav', '.flac', '.m4a', '.aac'  # Audio
         )
 
